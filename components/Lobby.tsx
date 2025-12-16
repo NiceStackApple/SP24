@@ -164,11 +164,14 @@ export const Lobby: React.FC<LobbyProps> = ({ onStart }) => {
 
         {/* Center: Controls */}
         <div className="flex-1 bg-gray-900/90 border border-gray-800 p-8 rounded-2xl shadow-2xl backdrop-blur-md h-fit min-h-[500px] flex flex-col">
-          <div className="text-center mb-6 relative">
-            <h1 className="text-5xl font-bold font-mono text-white mb-2 tracking-tighter">SURVIVAL<br/><span className="text-red-600">PROTOCOL: 24</span></h1>
-            <p className="text-gray-400 font-mono text-sm">MULTIPLAYER STRATEGY SIMULATION</p>
+          <div className="text-center mb-4 relative">
+            <h1 className="text-6xl font-bold font-mono text-white mb-1 tracking-tighter leading-none">
+              SURVIVAL<br/><span className="text-red-600">PROTOCOL: 24</span>
+            </h1>
+            <p className="text-gray-400 font-mono text-sm tracking-wide">MULTIPLAYER STRATEGY SIMULATION</p>
             
-            <div className="absolute top-0 right-0 flex gap-2">
+            {/* Top Left: Logs */}
+            <div className="absolute top-0 left-0">
                 <button 
                     onClick={() => setShowUpdates(true)}
                     className="p-2 text-gray-500 hover:text-white hover:bg-gray-800 rounded transition-colors flex flex-col items-center gap-1 group"
@@ -176,6 +179,10 @@ export const Lobby: React.FC<LobbyProps> = ({ onStart }) => {
                     <FileText size={20} />
                     <span className="text-[9px] font-mono tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">LOGS</span>
                 </button>
+            </div>
+
+            {/* Top Right: Profile/Exit */}
+            <div className="absolute top-0 right-0 flex gap-2">
                 {user && (
                   <button 
                       onClick={() => setShowProfile(true)}
@@ -202,9 +209,9 @@ export const Lobby: React.FC<LobbyProps> = ({ onStart }) => {
                  <AuthForms onLoginSuccess={handleLoginSuccess} />
              ) : (
                 <>
-                  <div className="text-center mb-8">
-                     <p className="text-xs font-mono text-gray-500 mb-1">OPERATIVE ACTIVE</p>
-                     <div className="text-2xl text-yellow-500 font-bold tracking-widest uppercase">{user.name}</div>
+                  <div className="text-center mb-6">
+                     <p className="text-[10px] font-mono text-gray-500 mb-0.5 tracking-widest">OPERATIVE ACTIVE</p>
+                     <div className="text-3xl text-yellow-500 font-bold tracking-widest uppercase">{user.name}</div>
                   </div>
 
                   {mode === 'MENU' && (
