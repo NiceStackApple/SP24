@@ -1,129 +1,240 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ActionType, Player, PlayerStatus, Phase } from '../types';
-import { Sword, Shield, Wind, Utensils, Moon } from 'lucide-react';
+import { Sword, Shield, Wind, Utensils, Moon, Crosshair, PlusCircle, Backpack } from 'lucide-react';
 import { GAME_CONFIG } from '../constants';
+import { BagModal } from './BagModal';
 
 interface ActionPanelProps {
   player: Player | undefined;
   phase: Phase;
   pendingAction: { type: ActionType, targetId?: string | null };
   onActionSelect: (type: ActionType) => void;
+  onUseItem: (item: string) => void;
 }
 
 export const ActionPanel: React.FC<ActionPanelProps> = ({ 
   player, 
   phase, 
   pendingAction,
-  onActionSelect 
+  onActionSelect,
+  onUseItem
 }) => {
-  if (!player || player.status === PlayerStatus.DEAD) return (
-    <div className="h-full flex items-center justify-center text-red-500 font-mono text-lg border-t border-gray-800 bg-gray-900">
-      YOU ARE DEAD. SPECTATOR MODE ACTIVE.
-    </div>
+  const [showBag, setShowBag] = useState(false);
+
+  // Auto-close bag when daytime ends
+  useEffect(() => {
+    if (phase !== Phase.DAY) {
+      setShowBag(false);
+    }
+  }, [phase]);
+
+  if (!player || player.status === PlayerStatus.DEAD) {
+      return (
+          <div className="h-full flex items-center justify-center">
+              <span className="text-gray-600 font-mono text-sm uppercase">Connection Lost (Deceased)</span>
+          </div>
+      )
+  }
+
+  const isStunned = player.status === PlayerStatus.STUNNED;
+  const isNight = phase === Phase.NIGHT || phase === Phase.GAME_OVER;
+
+  if (isNight) return (
+      <div className="h-full flex items-center justify-center">
+          <span className="text-blue-500/50 font-mono text-sm animate-pulse tracking-widest uppercase">
+            Resolving Night Phase...
+          </span>
+      </div>
   );
 
-  const isDay = phase === Phase.DAY;
-  const isStunned = player.status === PlayerStatus.STUNNED;
+  const attackAction = player.hasPistol 
+    ? { 
+        type: ActionType.SHOOT, 
+        icon: <Crosshair size={28} />, 
+        label: 'SHOOT', 
+        desc: `${GAME_CONFIG.PISTOL_DAMAGE_MIN}-${GAME_CONFIG.PISTOL_DAMAGE_MAX} DMG`,
+        hunger: GAME_CONFIG.PISTOL_COST_HUNGER,
+        fatigue: GAME_CONFIG.PISTOL_COST_FATIGUE,
+        color: 'text-yellow-400', 
+        border: 'border-yellow-600', 
+        bg: 'bg-yellow-900/20',
+        cooldown: 0,
+        isGain: false
+      }
+    : { 
+        type: ActionType.ATTACK, 
+        icon: <Sword size={28} />, 
+        label: 'ATTACK', 
+        desc: '30-40 DMG',
+        hunger: GAME_CONFIG.COST_ATTACK_HUNGER,
+        fatigue: GAME_CONFIG.COST_ATTACK_FATIGUE,
+        color: 'text-red-400', 
+        border: 'border-red-600', 
+        bg: 'bg-red-900/20',
+        isGain: false
+      };
 
-  const buttons = [
-    {
-      type: ActionType.ATTACK,
-      label: 'ATTACK',
-      icon: <Sword size={18} />,
-      cost: `H:-${GAME_CONFIG.COST_ATTACK_HUNGER} F:-${GAME_CONFIG.COST_ATTACK_FATIGUE}`,
-      desc: '30-40 DMG',
-      disabled: false,
-      color: 'hover:bg-red-900/50 border-red-900/50 text-red-400'
+  const actions = [
+    attackAction,
+    { 
+        type: ActionType.DEFEND, 
+        icon: <Shield size={28} />, 
+        label: 'DEFEND', 
+        desc: 'Block Dmg',
+        hunger: GAME_CONFIG.COST_DEFEND_HUNGER,
+        fatigue: GAME_CONFIG.COST_DEFEND_FATIGUE,
+        color: 'text-blue-400', 
+        border: 'border-blue-600', 
+        bg: 'bg-blue-900/20',
+        isGain: false
     },
-    {
-      type: ActionType.DEFEND,
-      label: 'DEFEND',
-      icon: <Shield size={18} />,
-      cost: `H:-${GAME_CONFIG.COST_DEFEND_HUNGER} F:-${GAME_CONFIG.COST_DEFEND_FATIGUE}`,
-      desc: 'Reduce DMG',
-      disabled: false,
-      color: 'hover:bg-blue-900/50 border-blue-900/50 text-blue-400'
+    { 
+        type: ActionType.RUN, 
+        icon: <Wind size={28} />, 
+        label: 'EXPLORE', 
+        desc: 'Dodge + Loot',
+        hunger: GAME_CONFIG.COST_RUN_HUNGER,
+        fatigue: GAME_CONFIG.COST_RUN_FATIGUE,
+        color: 'text-cyan-400', 
+        border: 'border-cyan-600', 
+        bg: 'bg-cyan-900/20',
+        cooldown: player.cooldowns.run,
+        isGain: false 
     },
-    {
-      type: ActionType.RUN,
-      label: 'RUN',
-      icon: <Wind size={18} />,
-      cost: `H:-${GAME_CONFIG.COST_RUN_HUNGER} F:-${GAME_CONFIG.COST_RUN_FATIGUE}`,
-      desc: 'Avoid Atk',
-      disabled: player.cooldowns.run > 0,
-      cooldown: player.cooldowns.run,
-      color: 'hover:bg-green-900/50 border-green-900/50 text-green-400'
+    { 
+        type: ActionType.HEAL, 
+        icon: <PlusCircle size={28} />, 
+        label: 'HEAL', 
+        desc: `+${GAME_CONFIG.HEAL_AMOUNT} HP (Target)`,
+        hunger: 0,
+        fatigue: GAME_CONFIG.COST_HEAL_FATIGUE,
+        color: 'text-emerald-400', 
+        border: 'border-emerald-600', 
+        bg: 'bg-emerald-900/20',
+        cooldown: 0,
+        isGain: false,
+        disabledCondition: player.fatigue < GAME_CONFIG.COST_HEAL_FATIGUE
     },
-    {
-      type: ActionType.EAT,
-      label: 'EAT',
-      icon: <Utensils size={18} />,
-      cost: `H:+${GAME_CONFIG.EAT_REGEN}`,
-      desc: `+${GAME_CONFIG.EAT_HP_REGEN} HP`,
-      disabled: player.cooldowns.eat > 0,
-      cooldown: player.cooldowns.eat,
-      color: 'hover:bg-orange-900/50 border-orange-900/50 text-orange-400'
+    { 
+        type: ActionType.EAT, 
+        icon: <Utensils size={28} />, 
+        label: 'EAT', 
+        desc: `+${GAME_CONFIG.EAT_REGEN} Hunger`,
+        hunger: -GAME_CONFIG.EAT_REGEN, 
+        fatigue: 0,
+        color: 'text-orange-400', 
+        border: 'border-orange-600', 
+        bg: 'bg-orange-900/20',
+        cooldown: player.cooldowns.eat,
+        isGain: true
     },
-    {
-      type: ActionType.REST,
-      label: 'REST',
-      icon: <Moon size={18} />,
-      cost: `F:+${GAME_CONFIG.REST_REGEN}`,
-      desc: `+${GAME_CONFIG.REST_HP_REGEN} HP`,
-      disabled: player.cooldowns.rest > 0,
-      cooldown: player.cooldowns.rest,
-      color: 'hover:bg-purple-900/50 border-purple-900/50 text-purple-400'
-    }
+    { 
+        type: ActionType.REST, 
+        icon: <Moon size={28} />, 
+        label: 'REST', 
+        desc: `+${GAME_CONFIG.REST_REGEN} Fatigue`,
+        hunger: 0,
+        fatigue: -GAME_CONFIG.REST_REGEN, 
+        color: 'text-purple-400', 
+        border: 'border-purple-600', 
+        bg: 'bg-purple-900/20',
+        cooldown: player.cooldowns.rest,
+        isGain: true
+    },
   ];
 
   return (
-    <div className="bg-gray-900 border-t border-gray-800 p-4">
-      <div className="flex items-center justify-between mb-2">
-         <h3 className="text-gray-400 text-sm font-mono tracking-wider">ACTION PROTOCOLS</h3>
-         {isStunned && <span className="text-purple-500 font-bold animate-pulse">UNIT STUNNED - ACTIONS LOCKED</span>}
-         {!isDay && !isStunned && <span className="text-yellow-500 text-sm">NIGHT PHASE - EXECUTION IN PROGRESS</span>}
-      </div>
+    <div className="h-full flex items-center gap-3 relative">
+      <BagModal 
+         isOpen={showBag} 
+         inventory={player.inventory} 
+         equippedItem={null}
+         onEquip={onUseItem}
+         onClose={() => setShowBag(false)}
+      />
 
-      <div className="grid grid-cols-5 gap-2">
-        {buttons.map((btn) => {
-          const isActive = pendingAction.type === btn.type;
-          const isDisabled = !isDay || isStunned || btn.disabled;
-          
-          return (
-            <button
-              key={btn.type}
-              onClick={() => onActionSelect(btn.type)}
-              disabled={isDisabled}
-              className={`
-                relative flex flex-col items-center justify-center p-3 rounded-lg border 
-                transition-all duration-150
-                ${btn.color}
-                ${isActive ? 'bg-opacity-100 ring-2 ring-white/20 scale-95 border-white/50' : 'bg-opacity-0 border-opacity-30'}
-                ${isDisabled ? 'opacity-30 cursor-not-allowed grayscale' : 'hover:scale-105 active:scale-95'}
-              `}
-            >
-              <div className="mb-1">{btn.icon}</div>
-              <span className="font-bold text-sm tracking-wider">{btn.label}</span>
-              <span className="text-[10px] opacity-70 mt-1 font-mono">{btn.cost}</span>
-              <span className="text-[9px] text-gray-300 mt-0.5">{btn.desc}</span>
-              
-              {btn.cooldown && btn.cooldown > 0 && (
-                <div className="absolute inset-0 bg-black/60 flex items-center justify-center rounded-lg backdrop-blur-sm">
-                   <span className="text-xl font-bold text-white">{btn.cooldown}d</span>
+      {actions.map((act) => {
+        const isActive = pendingAction.type === act.type;
+        
+        // Strict Cost Logic
+        const costH = act.isGain ? 0 : act.hunger;
+        const costF = act.isGain ? 0 : act.fatigue;
+        const hasStats = player.hunger >= costH && player.fatigue >= costF;
+
+        // Stun Logic: If stunned, only Eat/Rest allowed
+        const isAllowedWhileStunned = act.type === ActionType.EAT || act.type === ActionType.REST;
+        const isBlockedByStun = isStunned && !isAllowedWhileStunned;
+
+        // @ts-ignore
+        const isDisabled = isBlockedByStun || !hasStats || (act.cooldown && act.cooldown > 0) || (act.disabledCondition);
+        
+        return (
+          <button
+            key={act.type}
+            onClick={() => !isDisabled && onActionSelect(act.type)}
+            disabled={isDisabled as boolean}
+            className={`
+              relative flex flex-col items-center justify-between p-2 rounded-lg border-2 transition-all duration-200 h-28 w-28 text-center shrink-0
+              ${isActive ? `${act.border} ${act.bg} shadow-[0_0_15px_rgba(0,0,0,0.5)] scale-105 z-10` : 'border-gray-800 bg-gray-900 hover:bg-gray-800 hover:border-gray-600'}
+              ${isDisabled ? 'opacity-40 grayscale cursor-not-allowed' : 'hover:-translate-y-1'}
+            `}
+          >
+            <div className={`text-xs font-bold font-mono tracking-widest ${isActive ? 'text-white' : 'text-gray-400'}`}>
+              {act.label}
+            </div>
+            <div className={`${isActive ? act.color : 'text-gray-500'} mb-1`}>
+              {act.icon}
+            </div>
+            <div className="w-full space-y-1">
+               <div className="text-[9px] font-mono text-gray-300 truncate leading-none">{act.desc}</div>
+               <div className="flex justify-center gap-2 text-[9px] font-mono font-bold">
+                  {act.hunger !== 0 && (
+                      <span className={act.isGain ? 'text-green-500' : (player.hunger < act.hunger ? 'text-red-600 animate-pulse' : 'text-orange-500')}>
+                         {act.isGain ? '+' : '-'}{Math.abs(act.hunger)}H
+                      </span>
+                  )}
+                  {act.fatigue !== 0 && (
+                      <span className={act.isGain ? 'text-green-500' : (player.fatigue < act.fatigue ? 'text-red-600 animate-pulse' : 'text-blue-500')}>
+                         {act.isGain ? '+' : '-'}{Math.abs(act.fatigue)}F
+                      </span>
+                  )}
+               </div>
+            </div>
+            {/* @ts-ignore */}
+            {act.cooldown && act.cooldown > 0 && (
+                <div className="absolute inset-0 bg-black/80 flex items-center justify-center rounded-md backdrop-blur-[1px]">
+                  <span className="text-sm font-bold text-white font-mono">CD: {act.cooldown}d</span>
                 </div>
-              )}
-            </button>
-          );
-        })}
-      </div>
-      
-      <div className="mt-2 text-center h-5">
-        {pendingAction.type !== ActionType.NONE && isDay && (
-           <span className="text-xs text-gray-500 animate-pulse">
-             {pendingAction.type === ActionType.ATTACK ? "SELECT TARGET FROM GRID" : "ACTION LOCKED - AWAITING NIGHT"}
-           </span>
+            )}
+            {/* Stun Overlay */}
+            {isBlockedByStun && (
+                <div className="absolute inset-0 bg-black/80 flex items-center justify-center rounded-md backdrop-blur-[1px] z-20">
+                  <span className="text-sm font-bold text-red-500 font-mono">STUNNED</span>
+                </div>
+            )}
+            {isActive && (
+                <div className={`absolute -bottom-2 w-12 h-1 ${act.color.replace('text', 'bg')} rounded-full shadow-lg`}></div>
+            )}
+          </button>
+        );
+      })}
+
+      {/* SEPARATOR */}
+      <div className="w-px h-16 bg-gray-800 mx-1"></div>
+
+      {/* BAG BUTTON */}
+      <button 
+        onClick={() => setShowBag(true)}
+        className="h-28 w-16 border-2 border-gray-800 bg-gray-900 rounded-lg flex flex-col items-center justify-center hover:bg-gray-800 hover:border-gray-600 transition-all group shrink-0"
+      >
+        <Backpack size={24} className="text-gray-500 group-hover:text-white mb-2" />
+        <span className="text-[10px] font-mono text-gray-400 group-hover:text-white tracking-widest">BAG</span>
+        {player.inventory && player.inventory.length > 0 && (
+            <span className="bg-yellow-600 text-black text-[10px] font-bold px-1.5 rounded-full mt-1">
+                {player.inventory.length}
+            </span>
         )}
-      </div>
+      </button>
     </div>
   );
 };

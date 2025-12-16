@@ -9,8 +9,11 @@ const App: React.FC = () => {
     state, 
     startGame, 
     submitAction, 
+    useItem,
+    leaveGame,
     pendingAction,
-    sendChatMessage 
+    sendChatMessage,
+    closeModal
   } = useGameEngine();
 
   const handleActionSelect = (type: ActionType, targetId?: string) => {
@@ -27,6 +30,9 @@ const App: React.FC = () => {
       pendingAction={pendingAction} 
       onActionSelect={handleActionSelect}
       onSendMessage={sendChatMessage}
+      onEquipItem={useItem}
+      onLeaveGame={leaveGame}
+      onCloseModal={closeModal}
     />
   );
 };

@@ -33,6 +33,122 @@
       ::-webkit-scrollbar-thumb:hover {
         background: #444; 
       }
+
+      /* Animations */
+      @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        10%, 30%, 50%, 70%, 90% { transform: translateX(-1px); }
+        20%, 40%, 60%, 80% { transform: translateX(1px); }
+      }
+      .animate-shake {
+        animation: shake 0.3s cubic-bezier(.36,.07,.19,.97) both infinite;
+      }
+      
+      @keyframes shake-hard {
+        0% { transform: translate(1px, 1px) rotate(0deg); }
+        10% { transform: translate(-1px, -2px) rotate(-1deg); }
+        20% { transform: translate(-3px, 0px) rotate(1deg); }
+        30% { transform: translate(3px, 2px) rotate(0deg); }
+        40% { transform: translate(1px, -1px) rotate(1deg); }
+        50% { transform: translate(-1px, 2px) rotate(-1deg); }
+        60% { transform: translate(-3px, 1px) rotate(0deg); }
+        70% { transform: translate(3px, 1px) rotate(-1deg); }
+        80% { transform: translate(-1px, -1px) rotate(1deg); }
+        90% { transform: translate(1px, 2px) rotate(0deg); }
+        100% { transform: translate(1px, -2px) rotate(-1deg); }
+      }
+      .animate-shake-hard {
+        animation: shake-hard 0.5s ease-in-out infinite;
+      }
+
+      @keyframes ash-fall {
+        0% { transform: translateY(-10vh) translateX(0); opacity: 0; }
+        10% { opacity: 1; }
+        100% { transform: translateY(110vh) translateX(20px); opacity: 0; }
+      }
+      .animate-ash {
+        animation: ash-fall 3s linear infinite;
+      }
+
+      @keyframes sword-slash {
+        0% { transform: scale(0.5) rotate(-45deg); opacity: 0; }
+        20% { opacity: 1; transform: scale(1.0) rotate(-45deg); }
+        100% { transform: scale(1.4) rotate(65deg); opacity: 1; }
+      }
+      .animate-sword-slash {
+        animation: sword-slash 0.3s cubic-bezier(0.1, 0.7, 1.0, 0.1) forwards;
+      }
+
+      @keyframes damage-pop {
+        0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+        50% { transform: translate(-50%, -150%) scale(1.5); opacity: 1; }
+        100% { transform: translate(-50%, -200%) scale(1); opacity: 0; }
+      }
+      .animate-damage-pop {
+        animation: damage-pop 0.8s ease-out forwards;
+      }
+
+      /* POISON GAS VISUALS - ABSTRACT ONLY */
+      @keyframes gas-drift {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+      }
+      .animate-gas-drift {
+        background: linear-gradient(270deg, rgba(20, 83, 45, 0.4), rgba(50, 100, 50, 0.2), rgba(20, 83, 45, 0.4));
+        background-size: 400% 400%;
+        animation: gas-drift 10s ease infinite;
+      }
+
+      @keyframes toxic-pulse {
+        0% { backdrop-filter: blur(2px) hue-rotate(0deg) contrast(100%); }
+        50% { backdrop-filter: blur(4px) hue-rotate(15deg) contrast(110%); }
+        100% { backdrop-filter: blur(2px) hue-rotate(0deg) contrast(100%); }
+      }
+      .animate-toxic {
+        animation: toxic-pulse 5s ease-in-out infinite;
+      }
+      
+      @keyframes noise-grain {
+        0%, 100% { transform: translate(0, 0); }
+        10% { transform: translate(-5%, -5%); }
+        20% { transform: translate(-10%, 5%); }
+        30% { transform: translate(5%, -10%); }
+        40% { transform: translate(-5%, 15%); }
+        50% { transform: translate(-10%, 5%); }
+        60% { transform: translate(15%, 0); }
+        70% { transform: translate(0, 10%); }
+        80% { transform: translate(-15%, 0); }
+        90% { transform: translate(10%, 5%); }
+      }
+      .bg-noise {
+        position: fixed;
+        top: -50%;
+        left: -50%;
+        right: -50%;
+        bottom: -50%;
+        width: 200%;
+        height: 200vh;
+        background: transparent url('http://assets.iceable.com/img/noise-transparent.png') repeat 0 0;
+        background-repeat: repeat;
+        animation: noise-grain .2s infinite;
+        opacity: .1;
+        visibility: visible;
+      }
+
+      @keyframes screen-sway {
+        0% { transform: rotate(0deg) scale(1); }
+        25% { transform: rotate(0.2deg) scale(1.005); }
+        75% { transform: rotate(-0.2deg) scale(1.005); }
+        100% { transform: rotate(0deg) scale(1); }
+      }
+      .animate-sway {
+        animation: screen-sway 8s ease-in-out infinite;
+      }
+      
+      .text-shadow-md {
+        text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+      }
     </style>
   <script type="importmap">
 {

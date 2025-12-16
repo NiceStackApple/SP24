@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { BattleEvent, ActionType } from '../types';
-import { Sword } from 'lucide-react';
+import { Plus } from 'lucide-react';
 
 interface Props {
   event: BattleEvent | null;
@@ -9,73 +9,106 @@ interface Props {
 export const BattleAnimationLayer: React.FC<Props> = ({ event }) => {
   const [style, setStyle] = useState<React.CSSProperties>({});
   const [visible, setVisible] = useState(false);
+  const [animType, setAnimType] = useState<'GUN' | 'HEAL' | null>(null);
 
   useEffect(() => {
-    if (event?.type === ActionType.ATTACK && event.sourceId && event.targetId) {
-      const sourceEl = document.getElementById(`player-card-${event.sourceId}`);
-      const targetEl = document.getElementById(`player-card-${event.targetId}`);
+    // Only animate Shoot and Heal here. Sword is now inside PlayerCard.
+    if ((event?.type === ActionType.SHOOT || event?.type === ActionType.HEAL) && event.sourceId && event.targetId) {
       
-      if (sourceEl && targetEl) {
-        const sRect = sourceEl.getBoundingClientRect();
-        const tRect = targetEl.getBoundingClientRect();
-        
-        // Coordinates relative to viewport (fixed overlay)
-        const startX = sRect.left + sRect.width / 2;
-        const startY = sRect.top; 
-        
-        const endX = tRect.left + tRect.width / 2;
-        const endY = tRect.top + tRect.height / 2;
+      const isShoot = event.type === ActionType.SHOOT;
+      // Shoot is now instant, heal waits a bit
+      const delay = isShoot ? 50 : 1200; 
 
-        const angle = Math.atan2(endY - startY, endX - startX) * (180 / Math.PI) + 45;
+      const delayTimer = setTimeout(() => {
+          const sourceEl = document.getElementById(`player-card-${event.sourceId}`);
+          const targetEl = document.getElementById(`player-card-${event.targetId}`);
+          
+          if (sourceEl && targetEl) {
+            const sRect = sourceEl.getBoundingClientRect();
+            const tRect = targetEl.getBoundingClientRect();
+            
+            const startX = sRect.left + sRect.width / 2;
+            const startY = sRect.top + sRect.height / 2;
+            
+            const endX = tRect.left + tRect.width / 2;
+            const endY = tRect.top + tRect.height / 2;
 
-        // 1. Initial State (Spawn + Windup) - 0 to 150ms
-        // Hidden initially to allow "Pre-highlight" to be seen cleanly? 
-        // Or show immediately. Timeline: 0ms event starts. 150ms Spawn.
-        
-        setVisible(true);
-        setStyle({
-          transform: `translate(${startX}px, ${startY}px) scale(0.5)`,
-          opacity: 0,
-          transition: 'none'
-        });
+            if (event.type === ActionType.SHOOT) {
+               setAnimType('GUN');
+               const angle = Math.atan2(endY - startY, endX - startX) * (180 / Math.PI);
+               
+               setVisible(true);
+               setStyle({
+                 transform: `translate(${startX}px, ${startY}px) rotate(${angle}deg)`,
+                 opacity: 0,
+                 transition: 'none',
+                 width: '12px',
+                 height: '2px', // Thinner line
+                 background: '#fbbf24', 
+                 borderRadius: '2px',
+                 boxShadow: '0 0 5px #fbbf24'
+               });
+               
+               // Instant faint trace
+               setTimeout(() => {
+                 setStyle({
+                   transform: `translate(${endX}px, ${endY}px) rotate(${angle}deg)`,
+                   opacity: 0.4, // Faint
+                   transition: 'transform 150ms linear, opacity 100ms ease-out', 
+                   width: '12px',
+                   height: '2px',
+                   background: '#fbbf24',
+                   borderRadius: '2px',
+                   boxShadow: '0 0 5px #fbbf24'
+                 });
+               }, 20);
 
-        const spawnTimer = setTimeout(() => {
-          setStyle({
-            transform: `translate(${startX}px, ${startY - 20}px) scale(1) rotate(${angle}deg)`,
-            opacity: 1,
-            transition: 'transform 150ms ease-out, opacity 150ms ease-in'
-          });
-        }, 150);
+               setTimeout(() => setVisible(false), 200);
 
-        // 2. Flight - 300ms to 600ms
-        const flightTimer = setTimeout(() => {
-          setStyle({
-            transform: `translate(${endX}px, ${endY}px) scale(1) rotate(${angle}deg)`,
-            opacity: 1,
-            transition: 'transform 300ms cubic-bezier(0.4, 0, 0.2, 1)' 
-          });
-        }, 300);
+            } else if (event.type === ActionType.HEAL) {
+               setAnimType('HEAL');
+               
+               setVisible(true);
+               setStyle({
+                 transform: `translate(${startX}px, ${startY}px) scale(0.5)`,
+                 opacity: 0,
+                 transition: 'none',
+                 color: '#4ade80'
+               });
+               
+               setTimeout(() => {
+                  setStyle({
+                    transform: `translate(${startX}px, ${startY}px) scale(1.5)`,
+                    opacity: 1,
+                    transition: 'transform 200ms ease-out, opacity 200ms ease-in',
+                    color: '#4ade80'
+                  });
+               }, 50);
 
-        // 3. Exit - 700ms to 800ms
-        const exitTimer = setTimeout(() => {
-           setStyle(prev => ({
-             ...prev,
-             opacity: 0,
-             transition: 'opacity 100ms ease-out'
-           }));
-        }, 700);
+               setTimeout(() => {
+                  setStyle({
+                    transform: `translate(${endX}px, ${endY}px) scale(1)`,
+                    opacity: 0.8,
+                    transition: 'transform 400ms ease-in-out',
+                    color: '#4ade80'
+                  });
+               }, 250);
 
-        const endTimer = setTimeout(() => {
-          setVisible(false);
-        }, 850);
+               setTimeout(() => {
+                 setStyle(prev => ({
+                   ...prev,
+                   transform: `translate(${endX}px, ${endY}px) scale(2)`,
+                   opacity: 0,
+                   transition: 'transform 200ms ease-out, opacity 200ms ease-out'
+                 }));
+               }, 650);
 
-        return () => {
-          clearTimeout(spawnTimer);
-          clearTimeout(flightTimer);
-          clearTimeout(exitTimer);
-          clearTimeout(endTimer);
-        };
-      }
+               setTimeout(() => setVisible(false), 850);
+            }
+          }
+      }, delay);
+
+      return () => clearTimeout(delayTimer);
     } else {
       setVisible(false);
     }
@@ -83,14 +116,26 @@ export const BattleAnimationLayer: React.FC<Props> = ({ event }) => {
 
   if (!visible) return null;
 
-  return (
-    <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
-       <div 
-         className="absolute w-8 h-8 text-slate-200 drop-shadow-[0_0_8px_rgba(255,255,255,0.6)]"
-         style={{ ...style, width: 32, height: 32, marginLeft: -16, marginTop: -16, transformOrigin: 'center' }} 
-       >
-         <Sword size={32} fill="currentColor" fillOpacity={0.4} />
+  if (animType === 'GUN') {
+     return (
+       <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
+         <div className="absolute" style={style} />
        </div>
-    </div>
-  );
+     );
+  }
+
+  if (animType === 'HEAL') {
+     return (
+       <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
+         <div 
+           className="absolute w-8 h-8 drop-shadow-[0_0_15px_rgba(74,222,128,0.8)]"
+           style={{ ...style, width: 32, height: 32, marginLeft: -16, marginTop: -16, transformOrigin: 'center' }} 
+         >
+           <Plus size={32} fill="currentColor" />
+         </div>
+       </div>
+     );
+  }
+
+  return null;
 }
