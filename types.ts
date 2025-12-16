@@ -1,3 +1,4 @@
+
 export enum Phase {
   LOBBY = 'LOBBY',
   DAY = 'DAY',
@@ -20,6 +21,22 @@ export enum PlayerStatus {
   ALIVE = 'ALIVE',
   DEAD = 'DEAD',
   STUNNED = 'STUNNED'
+}
+
+export interface UserProfile {
+  name: string;
+  avatarId: number;
+  matchesPlayed: number;
+  wins: number;
+  kills: number;
+  deaths: number;
+}
+
+export interface Account {
+  username: string;
+  passwordHash: string;
+  secondPasswordHash: string; // Stored only for verification if needed later (requirement)
+  profile: UserProfile;
 }
 
 export interface Cooldowns {
@@ -109,8 +126,12 @@ export interface GameState {
   isHost: boolean;
   // UI State
   modal: ModalState;
+  
+  // Events
   volcanoDay: number; // Day the eruption occurs
   gasDay: number; // Day the poison gas occurs
+  pistolDay: number; // Day the pistol is found
+  
   volcanoEventActive?: boolean;
   gasEventActive?: boolean;
   

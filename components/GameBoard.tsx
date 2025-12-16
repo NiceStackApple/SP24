@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { GameState, ActionType, Phase, PlayerStatus } from '../types';
 import { PlayerCard } from './PlayerCard';
@@ -6,7 +7,7 @@ import { GameLog } from './GameLog';
 import { ChatPanel } from './ChatPanel';
 import { BattleAnimationLayer } from './BattleAnimationLayer';
 import { GlobalModal } from './GlobalModal';
-import { Clock, Sun, Moon, Eye, Heart, Skull, Loader, Flame, Biohazard, ShieldAlert, Ghost } from 'lucide-react';
+import { Clock, Sun, Moon, Eye, Heart, Skull, Loader, Flame, Biohazard, ShieldAlert, Ghost, AlertTriangle } from 'lucide-react';
 
 interface GameBoardProps {
   state: GameState;
@@ -65,8 +66,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   const aliveCount = state.players.filter(p => p.status === 'ALIVE').length;
   const isVolcanoDay = state.day === state.volcanoDay;
   const isGasDay = state.day === state.gasDay;
-  const isZoneDay = state.day === 20 || state.day === 30;
+  const isZoneDay = state.day === 20 || state.day === 30 || state.day === 45;
   const isMonsterDay = state.day === state.nextMonsterDay;
+
+  // WARNING LOGIC
+  const isVolcanoWarning = state.day === state.volcanoDay - 1;
+  const isGasWarning = state.day === state.gasDay - 1;
 
   return (
     <div className={`h-screen w-full flex bg-black text-gray-200 overflow-hidden font-rajdhani relative ${isVolcanoDay && !isDay && !state.volcanoEventActive ? 'animate-shake' : ''} ${state.volcanoEventActive ? 'animate-shake-hard' : ''} ${state.gasEventActive ? 'animate-sway' : ''} ${state.monsterEventActive ? 'animate-shake' : ''}`}>
@@ -221,6 +226,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                 <span className={`text-2xl font-mono font-bold ${isDay ? 'text-yellow-100' : 'text-blue-100'}`}>
                   DAY {state.day}
                 </span>
+                
+                {/* ACTIVE EVENT INDICATORS */}
                 {isVolcanoDay && (
                   <div className="ml-2 flex items-center gap-1 bg-red-900/50 border border-red-500 px-2 py-0.5 rounded animate-pulse">
                      <Flame size={12} className="text-red-500" />
@@ -243,6 +250,20 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                   <div className="ml-2 flex items-center gap-1 bg-purple-900/50 border border-purple-500 px-2 py-0.5 rounded animate-pulse">
                      <Ghost size={12} className="text-purple-500" />
                      <span className="text-xs font-bold text-purple-500 font-mono">MONSTER HUNT</span>
+                  </div>
+                )}
+
+                {/* WARNING INDICATORS (1 Day Prior) */}
+                {isVolcanoWarning && (
+                  <div className="ml-2 flex items-center gap-1 bg-yellow-900/30 border border-yellow-600 px-2 py-0.5 rounded">
+                     <AlertTriangle size={12} className="text-yellow-500" />
+                     <span className="text-xs font-bold text-yellow-500 font-mono">SEISMIC WARNING</span>
+                  </div>
+                )}
+                {isGasWarning && (
+                  <div className="ml-2 flex items-center gap-1 bg-yellow-900/30 border border-yellow-600 px-2 py-0.5 rounded">
+                     <AlertTriangle size={12} className="text-yellow-500" />
+                     <span className="text-xs font-bold text-yellow-500 font-mono">TOXIN WARNING</span>
                   </div>
                 )}
               </div>
@@ -278,6 +299,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                   onSelect={handlePlayerClick}
                   pendingActionType={player.id === state.myPlayerId ? pendingAction.type : undefined}
                   isVolcanoEvent={state.volcanoEventActive || state.gasEventActive || state.monsterEventActive}
+                  isResolving={state.phase === Phase.NIGHT}
                 />
               ))}
             </div>
@@ -328,6 +350,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                <ActionPanel 
                  player={me} 
                  phase={state.phase} 
+                 day={state.day}
                  pendingAction={pendingAction} 
                  onActionSelect={(type) => onActionSelect(type, null)} 
                  onUseItem={onEquipItem}

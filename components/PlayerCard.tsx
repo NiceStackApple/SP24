@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Player, PlayerStatus, BattleEvent, ActionType } from '../types';
 import { Shield, ZapOff, Sword, Wind, Moon, Crosshair, Utensils, Zap, Skull, PlusCircle, Flame } from 'lucide-react';
@@ -10,6 +11,7 @@ interface PlayerCardProps {
   activeEvent: BattleEvent | null;
   pendingActionType?: ActionType;
   isVolcanoEvent?: boolean;
+  isResolving: boolean;
   onSelect: (id: string) => void;
 }
 
@@ -18,8 +20,9 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
   isMe, 
   isSelected, 
   activeEvent, 
-  pendingActionType,
+  pendingActionType, 
   isVolcanoEvent,
+  isResolving,
   onSelect 
 }) => {
   const isDead = player.status === PlayerStatus.DEAD;
@@ -34,11 +37,12 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
   const [highlight, setHighlight] = useState<string | null>(null);
   const [dimmed, setDimmed] = useState(false);
   const [showActionIcon, setShowActionIcon] = useState<React.ReactNode | null>(null);
+  const [showBlockShield, setShowBlockShield] = useState(false); // NEW: For block reaction
   const [showDamage, setShowDamage] = useState<{ text: string, color: string } | null>(null);
   const [swordSwing, setSwordSwing] = useState(false);
   const [slashEffect, setSlashEffect] = useState(false);
   
-  // Physical Movement State
+  // Physical Movement State (Attacker Move OR Dodge Move)
   const [transformStyle, setTransformStyle] = useState<React.CSSProperties>({});
   const [isTopLayer, setIsTopLayer] = useState(false);
 
@@ -46,12 +50,18 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
     // RESET ALL STATES IF NO EVENT
     if (!activeEvent) {
        setHighlight(null);
-       setDimmed(false);
+       
+       // FIX: Maintain dim state during Night phase gaps to prevent flickering
+       // If isResolving (Night) is true, we stay dimmed until an event specifically targets us.
+       setDimmed(isResolving);
+
        setShowActionIcon(null);
+       setShowBlockShield(false);
        setShowDamage(null);
        setSwordSwing(false);
        setSlashEffect(false);
-       setTransformStyle({});
+       // ANCHOR LOCK FIX: Force instant reset with no transition to prevent ghost positions
+       setTransformStyle({ transform: 'translate(0,0)', transition: 'none' });
        setIsTopLayer(false);
        return;
     }
@@ -69,21 +79,21 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
         setHighlight('YELLOW'); // Attacker is YELLOW
         setIsTopLayer(true); // Bring to front
 
-        // Calculate Physical Move
+        // ANCHOR LOCK FIX: Use offsetLeft/Top (Layout Position) to ignore current visual transforms
         const targetEl = document.getElementById(`player-card-${activeEvent.targetId}`);
         const sourceEl = document.getElementById(`player-card-${player.id}`);
         
         if (targetEl && sourceEl) {
-             const tRect = targetEl.getBoundingClientRect();
-             const sRect = sourceEl.getBoundingClientRect();
+             const xDiff = targetEl.offsetLeft - sourceEl.offsetLeft;
+             const yDiff = targetEl.offsetTop - sourceEl.offsetTop;
              
              // Move to overlap target slightly (20% offset x, 10% offset y)
-             const dx = tRect.left - sRect.left + (tRect.width * 0.2); 
-             const dy = tRect.top - sRect.top + (tRect.height * 0.1);
+             const dx = xDiff + (targetEl.offsetWidth * 0.2); 
+             const dy = yDiff + (targetEl.offsetHeight * 0.1);
 
              setTransformStyle({
                  transform: `translate(${dx}px, ${dy}px)`,
-                 transition: 'transform 0.5s ease-in-out',
+                 transition: 'transform 0.5s cubic-bezier(0.25, 1, 0.5, 1)',
                  zIndex: 100
              });
 
@@ -144,14 +154,42 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
        setDimmed(false);
        setHighlight('RED'); // Target is RED
 
+       // --- DEFEND REACTION (BLOCK) ---
+       if (activeEvent.isBlocked) {
+          setShowBlockShield(true);
+       }
+
+       // --- EXPLORE REACTION (DODGE) ---
+       // "Quick dodge motion" -> Only if Missed AND Last Action was Run (Explore)
+       if (activeEvent.isMiss && !isDead && player.lastAction === ActionType.RUN) {
+          const dir = Math.random() > 0.5 ? 1 : -1;
+          setTransformStyle({
+              transform: `translateX(${dir * 40}px) rotate(${dir * 10}deg)`,
+              transition: 'transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+          });
+          
+          // Snap back
+          setTimeout(() => {
+              setTransformStyle({
+                  transform: 'translateX(0) rotate(0)',
+                  transition: 'transform 0.2s ease-in'
+              });
+          }, 300);
+       }
+
        // Impact Phase
        const actionTimer = setTimeout(() => {
             if (activeEvent.type === ActionType.ATTACK) {
                 // Triggered at 500ms (Collision)
                 if (activeEvent.isMiss) {
-                    setShowDamage({ text: "MISS", color: "text-blue-400 font-bold" });
+                    // Check if it was a corpse hit or a dodge
+                    const isDodge = !isDead && player.lastAction === ActionType.RUN;
+                    setShowDamage({ 
+                        text: isDodge ? "DODGE" : "MISS", 
+                        color: "text-blue-400 font-bold" 
+                    });
                 } else if (activeEvent.isBlocked) {
-                    setShowDamage({ text: `BLOCKED`, color: "text-blue-300" });
+                    setShowDamage({ text: `BLOCKED`, color: "text-blue-300 font-bold" });
                 } else {
                     setSlashEffect(true);
                     // Damage number appears exactly with slash
@@ -172,7 +210,7 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
        setDimmed(true);
        setHighlight(null);
     }
-  }, [activeEvent, player.id, isVolcanoEvent]);
+  }, [activeEvent, player.id, isVolcanoEvent, isResolving]);
 
   // Mass Event Animations
   let animClass = '';
@@ -189,7 +227,7 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
       if (highlight === 'RED') {
           // TARGET
           animClass = 'border-red-600 shadow-[0_0_25px_rgba(220,38,38,0.8)] scale-105 z-20';
-          // Shake effect if damaged
+          // Shake effect if damaged (not blocked/missed)
           if (slashEffect) animClass += ' animate-shake-hard';
       } else if (highlight === 'YELLOW') {
           // ATTACKER (SWORD + PISTOL)
@@ -261,6 +299,13 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
          <div className="absolute top-1 right-1 z-40 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
             {showActionIcon}
          </div>
+      )}
+
+      {/* BLOCK SHIELD ICON (Target Reaction) */}
+      {showBlockShield && (
+          <div className="absolute top-1 right-1 z-40 animate-shield-flash">
+               <Shield size={28} className="text-blue-400 fill-blue-900/50" />
+          </div>
       )}
 
       {/* Damage/Heal Text */}

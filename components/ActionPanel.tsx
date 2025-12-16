@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import { ActionType, Player, PlayerStatus, Phase } from '../types';
 import { Sword, Shield, Wind, Utensils, Moon, Crosshair, PlusCircle, Backpack } from 'lucide-react';
 import { GAME_CONFIG } from '../constants';
@@ -7,6 +8,7 @@ import { BagModal } from './BagModal';
 interface ActionPanelProps {
   player: Player | undefined;
   phase: Phase;
+  day: number;
   pendingAction: { type: ActionType, targetId?: string | null };
   onActionSelect: (type: ActionType) => void;
   onUseItem: (item: string) => void;
@@ -15,18 +17,34 @@ interface ActionPanelProps {
 export const ActionPanel: React.FC<ActionPanelProps> = ({ 
   player, 
   phase, 
+  day,
   pendingAction,
   onActionSelect,
   onUseItem
 }) => {
   const [showBag, setShowBag] = useState(false);
+  const [hasNewItems, setHasNewItems] = useState(false);
+  // Track inventory size to detect new items
+  const prevInventoryLenRef = useRef(player?.inventory.length || 0);
 
-  // Auto-close bag when daytime ends
   useEffect(() => {
-    if (phase !== Phase.DAY) {
-      setShowBag(false);
+    if (!player) return;
+    const currentLen = player.inventory.length;
+    
+    // If inventory grew AND bag isn't currently open, show dot
+    if (currentLen > prevInventoryLenRef.current) {
+        if (!showBag) {
+            setHasNewItems(true);
+        }
     }
-  }, [phase]);
+    
+    prevInventoryLenRef.current = currentLen;
+  }, [player?.inventory.length, showBag, player]);
+
+  const handleOpenBag = () => {
+      setShowBag(true);
+      setHasNewItems(false); // Clear notification on open
+  };
 
   if (!player || player.status === PlayerStatus.DEAD) {
       return (
@@ -38,6 +56,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
 
   const isStunned = player.status === PlayerStatus.STUNNED;
   const isNight = phase === Phase.NIGHT || phase === Phase.GAME_OVER;
+  const isLockdown = day >= GAME_CONFIG.LOCKDOWN_DAY;
 
   if (isNight) return (
       <div className="h-full flex items-center justify-center">
@@ -126,7 +145,8 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
         border: 'border-orange-600', 
         bg: 'bg-orange-900/20',
         cooldown: player.cooldowns.eat,
-        isGain: true
+        isGain: true,
+        disabledCondition: isLockdown
     },
     { 
         type: ActionType.REST, 
@@ -139,7 +159,8 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
         border: 'border-purple-600', 
         bg: 'bg-purple-900/20',
         cooldown: player.cooldowns.rest,
-        isGain: true
+        isGain: true,
+        disabledCondition: isLockdown
     },
   ];
 
@@ -212,6 +233,13 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
                   <span className="text-sm font-bold text-red-500 font-mono">STUNNED</span>
                 </div>
             )}
+            {/* Lockdown Overlay */}
+            {/* @ts-ignore */}
+            {act.disabledCondition && isLockdown && (
+                <div className="absolute inset-0 bg-black/80 flex items-center justify-center rounded-md backdrop-blur-[1px] z-20 border border-red-900/50">
+                  <span className="text-sm font-bold text-red-500 font-mono">LOCKED</span>
+                </div>
+            )}
             {isActive && (
                 <div className={`absolute -bottom-2 w-12 h-1 ${act.color.replace('text', 'bg')} rounded-full shadow-lg`}></div>
             )}
@@ -224,16 +252,16 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
 
       {/* BAG BUTTON */}
       <button 
-        onClick={() => setShowBag(true)}
-        className="h-28 w-16 border-2 border-gray-800 bg-gray-900 rounded-lg flex flex-col items-center justify-center hover:bg-gray-800 hover:border-gray-600 transition-all group shrink-0"
+        onClick={handleOpenBag}
+        className="h-28 w-16 border-2 border-gray-800 bg-gray-900 rounded-lg flex flex-col items-center justify-center hover:bg-gray-800 hover:border-gray-600 transition-all group shrink-0 hover:-translate-y-1 cursor-pointer relative"
       >
-        <Backpack size={24} className="text-gray-500 group-hover:text-white mb-2" />
-        <span className="text-[10px] font-mono text-gray-400 group-hover:text-white tracking-widest">BAG</span>
-        {player.inventory && player.inventory.length > 0 && (
-            <span className="bg-yellow-600 text-black text-[10px] font-bold px-1.5 rounded-full mt-1">
-                {player.inventory.length}
-            </span>
-        )}
+        <div className="relative">
+            <Backpack size={24} className="text-gray-500 mb-2 group-hover:text-yellow-500" />
+            {hasNewItems && (
+                <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-yellow-500 rounded-full border border-gray-900"></div>
+            )}
+        </div>
+        <span className="text-[10px] font-mono text-gray-400 tracking-widest group-hover:text-white">BAG</span>
       </button>
     </div>
   );

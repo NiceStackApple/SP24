@@ -1,3 +1,4 @@
+
 export const GAME_CONFIG = {
   MAX_PLAYERS: 24,
   // Duration Scaling handled in helper function
@@ -57,7 +58,11 @@ export const GAME_CONFIG = {
 
   // Monster Event
   MONSTER_START_DAY: 30,
-  MONSTER_DAMAGE: 45,
+  MONSTER_DAMAGE_MIN: 20,
+  MONSTER_DAMAGE_MAX: 30,
+
+  // Endgame
+  LOCKDOWN_DAY: 50,
 };
 
 export const NAMES_LIST = [
