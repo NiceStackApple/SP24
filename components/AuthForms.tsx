@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { storageService } from '../services/storageService';
+import { useAuth } from '../context/AuthContext';
 import { Lock, User, Key, ShieldCheck, LogIn, UserPlus } from 'lucide-react';
 
 interface AuthFormsProps {
@@ -8,36 +8,53 @@ interface AuthFormsProps {
 }
 
 export const AuthForms: React.FC<AuthFormsProps> = ({ onLoginSuccess }) => {
+  const { login, register } = useAuth();
   const [view, setView] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [secondPassword, setSecondPassword] = useState('');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setIsLoading(true);
     
-    const res = storageService.register(username, password, secondPassword);
-    if (res.success) {
-      setView('LOGIN');
-      setPassword('');
-      setSecondPassword('');
-      setError('Account created. Please log in.');
-    } else {
-      setError(res.error || 'Registration failed');
+    try {
+        await register(username, password, "Second Password", secondPassword);
+        setView('LOGIN');
+        setPassword('');
+        setSecondPassword('');
+        setError('Account created. Please log in.');
+    } catch (err: any) {
+        // Firebase Auth Errors
+        if (err.code === 'auth/email-already-in-use') {
+            setError('Username already taken');
+        } else if (err.code === 'auth/weak-password') {
+            setError('Password too weak');
+        } else if (err.code === 'permission-denied') {
+            setError('Database Permission Error: Please update Firestore Rules in Console.');
+        } else {
+            setError(err.message || 'Registration failed');
+        }
+    } finally {
+        setIsLoading(false);
     }
   };
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setIsLoading(true);
 
-    const res = storageService.login(username, password);
-    if (res.success) {
-      onLoginSuccess();
-    } else {
-      setError(res.error || 'Login failed');
+    try {
+        await login(username, password);
+        onLoginSuccess();
+    } catch (err: any) {
+        setError('Invalid credentials');
+    } finally {
+        setIsLoading(false);
     }
   };
 
@@ -93,10 +110,11 @@ export const AuthForms: React.FC<AuthFormsProps> = ({ onLoginSuccess }) => {
           </div>
           <button 
             type="submit"
-            className="w-full bg-yellow-600 hover:bg-yellow-700 text-black font-bold py-3 rounded mt-4 flex items-center justify-center gap-2 shadow-lg shadow-yellow-900/20"
+            disabled={isLoading}
+            className="w-full bg-yellow-600 hover:bg-yellow-700 disabled:opacity-50 text-black font-bold py-3 rounded mt-4 flex items-center justify-center gap-2 shadow-lg shadow-yellow-900/20"
           >
             <LogIn size={16} />
-            <span>AUTHENTICATE</span>
+            <span>{isLoading ? 'AUTHENTICATING...' : 'AUTHENTICATE'}</span>
           </button>
         </form>
       )}
@@ -145,10 +163,11 @@ export const AuthForms: React.FC<AuthFormsProps> = ({ onLoginSuccess }) => {
           </div>
           <button 
             type="submit"
+            disabled={isLoading}
             className="w-full bg-gray-800 hover:bg-gray-700 text-gray-200 font-bold py-3 rounded mt-4 flex items-center justify-center gap-2 border border-gray-600"
           >
             <UserPlus size={16} />
-            <span>REGISTER OPERATIVE</span>
+            <span>{isLoading ? 'REGISTERING...' : 'REGISTER OPERATIVE'}</span>
           </button>
         </form>
       )}

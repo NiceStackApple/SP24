@@ -44,6 +44,7 @@ export interface UserDocument {
 export interface FirestorePlayer {
   is_bot: boolean;
   connection_status: 'CONNECTED' | 'DISCONNECTED';
+  last_active: number; // Timestamp for heartbeat/timeout
   hp: number;
   hunger: number;
   fatigue: number;
@@ -52,13 +53,24 @@ export interface FirestorePlayer {
     type: string;
     target: string | null;
   };
-  // Map these back to existing UI types where needed
-  username?: string; // Helper, usually doc ID
+  // NEW: Authoritative State Fields
+  status: PlayerStatus;
+  cooldowns: Cooldowns;
+  active_buffs: PlayerBuffs;
+  last_explore_day: number;
+  kills: number;
+  has_pistol: boolean;
+  avatar_id: number; // Visual identity
+  
+  // Helper, usually doc ID
+  username?: string; 
 }
 
 export interface RoomDocument {
+  room_name?: string; // Display name for browser
   host_username: string;
   is_public: boolean;
+  player_count: number; // Optimization for Lobby listing
   status: 'LOBBY' | 'IN_PROGRESS' | 'RESOLVING' | 'ENDED';
   current_day: number;
   phase: 'DAY' | 'NIGHT';
@@ -115,6 +127,9 @@ export interface Player {
   hasPistol: boolean;
   inventory: string[];
   activeBuffs: PlayerBuffs;
+  // UI Helper
+  lastExploreDay?: number;
+  pendingActionType?: ActionType; // Helper for UI
 }
 
 export interface LogEntry {

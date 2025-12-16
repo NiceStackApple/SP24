@@ -7,7 +7,7 @@ import {
   onAuthStateChanged,
   User 
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
 import { UserDocument } from '../types';
 
@@ -38,25 +38,62 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Sync Auth State
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    let unsubscribeDoc = () => {};
+
+    const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
+      
+      // Cleanup previous listener if any
+      unsubscribeDoc();
+
       if (currentUser) {
-         // Email format: username@survival.game
-         // Extract username from email
          const username = currentUser.email?.split('@')[0];
          if (username) {
              const docRef = doc(db, 'users', username);
-             const docSnap = await getDoc(docRef);
-             if (docSnap.exists()) {
-                 setUserData(docSnap.data() as UserDocument);
-             }
+             
+             // Real-time listener for User Data
+             // This is crucial for 'active_session_id' updates (Surrender/Leave)
+             unsubscribeDoc = onSnapshot(docRef, (docSnap) => {
+                 if (docSnap.exists()) {
+                     setUserData(docSnap.data() as UserDocument);
+                 } else {
+                     // SELF-HEAL: Attempt to recreate user doc if missing
+                     console.warn("User document missing. Attempting self-heal recreation.");
+                     const recoveredUser: UserDocument = {
+                        username: username,
+                        security_question: "Recovery",
+                        security_answer: "Recovery",
+                        created_at: serverTimestamp(),
+                        active_session_id: null,
+                        stats: {
+                            total_matches: 0,
+                            wins: 0,
+                            kills: 0,
+                            days_survived: 0
+                        }
+                     };
+                     setDoc(docRef, recoveredUser).catch(console.error);
+                     // setDoc will trigger the snapshot again
+                 }
+                 setLoading(false);
+             }, (err) => {
+                 console.error("Failed to fetch user data:", err);
+                 // Do not block app, but data might be missing
+                 setLoading(false);
+             });
+         } else {
+             setLoading(false);
          }
       } else {
         setUserData(null);
+        setLoading(false);
       }
-      setLoading(false);
     });
-    return unsubscribe;
+
+    return () => {
+        unsubscribeAuth();
+        unsubscribeDoc();
+    };
   }, []);
 
   const login = async (username: string, pass: string) => {
@@ -68,7 +105,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const email = `${username}@survival.game`;
     
     // 1. Create Auth User
-    const cred = await createUserWithEmailAndPassword(auth, email, pass);
+    await createUserWithEmailAndPassword(auth, email, pass);
     
     // 2. Create Firestore User Document
     const newUser: UserDocument = {

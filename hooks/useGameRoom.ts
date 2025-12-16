@@ -1,11 +1,14 @@
 
 import { useState, useEffect } from 'react';
-import { doc, setDoc, getDoc, updateDoc, onSnapshot, collection, addDoc, query, where, getDocs, writeBatch, serverTimestamp } from 'firebase/firestore';
-import { ref, onDisconnect, set, remove } from 'firebase/database'; // Realtime DB for presence
+import { 
+    doc, setDoc, getDoc, updateDoc, onSnapshot, collection, 
+    query, where, getDocs, writeBatch, serverTimestamp, increment, deleteDoc 
+} from 'firebase/firestore';
+import { ref, onDisconnect, set, remove } from 'firebase/database';
 import { db, rtdb } from '../services/firebase';
 import { useAuth } from '../context/AuthContext';
-import { RoomDocument, FirestorePlayer, Phase } from '../types';
-import { GAME_CONFIG } from '../constants';
+import { RoomDocument, FirestorePlayer, Phase, PlayerStatus } from '../types';
+import { GAME_CONFIG, NAMES_LIST } from '../constants';
 
 export const useGameRoom = () => {
   const { user, userData } = useAuth();
@@ -17,110 +20,177 @@ export const useGameRoom = () => {
 
   // --- ROOM LISTENERS ---
   useEffect(() => {
-    if (!roomId) return;
+    if (!roomId) {
+        setRoomData(null);
+        setPlayers([]);
+        return;
+    }
 
     // Listen to Room Doc
-    const roomUnsub = onSnapshot(doc(db, 'rooms', roomId), (doc) => {
-       if (doc.exists()) {
-           setRoomData(doc.data() as RoomDocument);
+    const roomUnsub = onSnapshot(doc(db, 'rooms', roomId), (docSnap) => {
+       if (docSnap.exists()) {
+           setRoomData(docSnap.data() as RoomDocument);
        } else {
-           // Room deleted (Match ended)
+           // Room deleted or doesn't exist -> Kick user to menu
            setRoomId(null);
            setRoomData(null);
+           setPlayers([]);
+           // Ensure session is cleared if we get kicked
+           if (userData?.username) {
+              setDoc(doc(db, 'users', userData.username), { active_session_id: null }, { merge: true });
+           }
        }
+    }, (err) => {
+        console.error("Room listener error", err);
+        if (err.code === 'permission-denied') {
+            setError("Database access denied. Check Firestore Rules in Firebase Console.");
+        }
     });
 
-    // Listen to Players Subcollection
-    const playersUnsub = onSnapshot(collection(db, 'rooms', roomId, 'players'), (snapshot) => {
+    // Listen to Players
+    const playersRef = collection(db, 'rooms', roomId, 'players');
+    const playersUnsub = onSnapshot(playersRef, (snapshot) => {
         const pList: FirestorePlayer[] = [];
         snapshot.forEach((doc) => {
             pList.push({ ...doc.data() as FirestorePlayer, username: doc.id });
         });
         setPlayers(pList);
+    }, (err) => {
+        console.error("Player listener error", err);
     });
 
     return () => {
         roomUnsub();
         playersUnsub();
     };
-  }, [roomId]);
+  }, [roomId, userData]); // Added userData dependency for session clear
 
-  // --- PRESENCE SYSTEM (DISCONNECT) ---
+  // --- PRESENCE SYSTEM ---
   useEffect(() => {
     if (!roomId || !userData?.username) return;
 
     const username = userData.username;
-    // Realtime Database Ref for Presence
     const presenceRef = ref(rtdb, `rooms/${roomId}/players/${username}`);
-
-    // Firestore Ref for Status
     const firestorePlayerRef = doc(db, 'rooms', roomId, 'players', username);
 
-    // On Disconnect (Tab Close), remove from RTDB (trigger only)
-    onDisconnect(presenceRef).set('offline').then(() => {
-         set(presenceRef, 'online');
-         // Also update Firestore status strictly on connect
-         updateDoc(firestorePlayerRef, { connection_status: 'CONNECTED' });
-    });
+    // Set RTDB presence to online
+    set(presenceRef, { status: 'online', last_changed: Date.now() });
 
-    // Note: A true "On Disconnect update Firestore" requires Cloud Functions triggered by RTDB onDisconnect
-    // For this prototype, we update to 'CONNECTED' on mount.
-    // Ideally, we'd use a Cloud Function to listen to RTDB delete/update events and update Firestore.
+    // On Disconnect: remove RTDB node
+    onDisconnect(presenceRef).remove();
+
+    // Heartbeat logic could go here, but for now we rely on explicit actions
+    // Mark as CONNECTED in Firestore on mount
+    updateDoc(firestorePlayerRef, { 
+        connection_status: 'CONNECTED',
+        last_active: Date.now()
+    }).catch(console.error);
 
     return () => {
-        // Cleanup if needed manually
+        // We do NOT mark disconnected here to handle page refreshes gracefully
+        // The RTDB onDisconnect handles the actual "tab closed" scenario detection for other clients
     };
   }, [roomId, userData]);
 
+  // --- HOST RECONCILIATION (SINGLE SOURCE OF TRUTH) ---
+  useEffect(() => {
+    if (!roomId || !roomData || !userData) return;
+    
+    // Only Host performs reconciliation to avoid write contention
+    if (roomData.host_username !== userData.username) return;
+    
+    // Only strictly needed in Lobby for public listing accuracy
+    // Once game starts, bots are added and count is managed differently
+    if (roomData.status !== 'LOBBY') return;
+
+    const realCount = players.length;
+    
+    // If mismatch detected, correct it
+    // This self-heals any failed 'increment' operations from leaving players
+    if (roomData.player_count !== realCount) {
+        console.log(`Reconciling player count: ${roomData.player_count} -> ${realCount}`);
+        updateDoc(doc(db, 'rooms', roomId), {
+            player_count: realCount
+        }).catch(console.error);
+    }
+  }, [players.length, roomData?.player_count, roomId, roomData?.host_username, userData?.username, roomData?.status]);
 
   // --- ACTIONS ---
 
+  const handleFirebaseError = (err: any) => {
+      console.error(err);
+      if (err.code === 'permission-denied') {
+          setError("Access Denied: Please set Firestore Security Rules to public (test mode) in Firebase Console.");
+      } else {
+          setError(err.message || "An unexpected error occurred.");
+      }
+  };
+
+  const getInitialPlayerState = (): FirestorePlayer => ({
+    is_bot: false,
+    connection_status: 'CONNECTED',
+    last_active: Date.now(),
+    hp: GAME_CONFIG.START_HP,
+    hunger: GAME_CONFIG.START_HUNGER,
+    fatigue: GAME_CONFIG.START_FATIGUE,
+    inventory: [],
+    pending_action: { type: 'NONE', target: null },
+    status: PlayerStatus.ALIVE,
+    cooldowns: { eat: 0, rest: 0, run: 0, shoot: 0, eatCount: 0, restCount: 0 },
+    active_buffs: { damageBonus: 0, ignoreFatigue: false },
+    last_explore_day: 0,
+    kills: 0,
+    has_pistol: false,
+    avatar_id: Math.floor(Math.random() * 1000) + 1
+  });
+
   const createRoom = async (isPublic: boolean) => {
-    if (!userData) return;
+    if (!userData) {
+        setError("User data not loaded. Please wait or re-login.");
+        return;
+    }
     setLoading(true);
+    setError(null);
     try {
-        // Generate 5-char code
         const code = Math.random().toString(36).substring(2, 7).toUpperCase();
         
         const newRoom: RoomDocument = {
+            room_name: `${userData.username}'s Lobby`,
             host_username: userData.username,
             is_public: isPublic,
+            player_count: 1,
             status: 'LOBBY',
             current_day: 1,
             phase: Phase.DAY,
-            next_phase_time: null, // Logic will handle this
+            next_phase_time: null,
             events: []
         };
 
-        // Create Room
-        await setDoc(doc(db, 'rooms', code), newRoom);
-        
-        // Add Host as Player
-        const hostPlayer: FirestorePlayer = {
-            is_bot: false,
-            connection_status: 'CONNECTED',
-            hp: GAME_CONFIG.START_HP,
-            hunger: GAME_CONFIG.START_HUNGER,
-            fatigue: GAME_CONFIG.START_FATIGUE,
-            inventory: [],
-            pending_action: { type: 'NONE', target: null }
-        };
-        await setDoc(doc(db, 'rooms', code, 'players', userData.username), hostPlayer);
-        
-        // Update User Active Session
-        await updateDoc(doc(db, 'users', userData.username), { active_session_id: code });
+        const hostPlayer = getInitialPlayerState();
 
+        const batch = writeBatch(db);
+        batch.set(doc(db, 'rooms', code), newRoom);
+        batch.set(doc(db, 'rooms', code, 'players', userData.username), hostPlayer);
+        
+        // Use set with merge: true for robustness
+        batch.set(doc(db, 'users', userData.username), { active_session_id: code }, { merge: true });
+
+        await batch.commit();
         setRoomId(code);
     } catch (err: any) {
-        setError(err.message);
+        handleFirebaseError(err);
     } finally {
         setLoading(false);
     }
   };
 
   const joinRoom = async (code: string) => {
-     if (!userData) return;
+     if (!userData) {
+         setError("User data not loaded.");
+         return;
+     }
      setLoading(true);
+     setError(null);
      try {
          const roomRef = doc(db, 'rooms', code);
          const roomSnap = await getDoc(roomRef);
@@ -130,24 +200,30 @@ export const useGameRoom = () => {
          
          if (rData.status !== 'LOBBY') throw new Error("Match already in progress");
 
-         // Add Player
-         const newPlayer: FirestorePlayer = {
-            is_bot: false,
-            connection_status: 'CONNECTED',
-            hp: GAME_CONFIG.START_HP,
-            hunger: GAME_CONFIG.START_HUNGER,
-            fatigue: GAME_CONFIG.START_FATIGUE,
-            inventory: [],
-            pending_action: { type: 'NONE', target: null }
-        };
-        await setDoc(doc(db, 'rooms', code, 'players', userData.username), newPlayer);
-        
-        // Update Session
-        await updateDoc(doc(db, 'users', userData.username), { active_session_id: code });
+         // Check if already in (rejoin logic handles this usually, but explicit join needs check)
+         const playerRef = doc(db, 'rooms', code, 'players', userData.username);
+         const playerSnap = await getDoc(playerRef);
 
-        setRoomId(code);
+         const batch = writeBatch(db);
+         
+         if (!playerSnap.exists()) {
+             // New Join
+            const newPlayer = getInitialPlayerState();
+            batch.set(playerRef, newPlayer);
+            batch.update(roomRef, { player_count: increment(1) });
+         } else {
+             // Re-join existing
+             batch.update(playerRef, { connection_status: 'CONNECTED', last_active: Date.now() });
+         }
+         
+         // Use set with merge: true
+         batch.set(doc(db, 'users', userData.username), { active_session_id: code }, { merge: true });
+         
+         await batch.commit();
+
+         setRoomId(code);
      } catch (err: any) {
-         setError(err.message);
+         handleFirebaseError(err);
      } finally {
          setLoading(false);
      }
@@ -155,39 +231,46 @@ export const useGameRoom = () => {
 
   const startGame = async () => {
       if (!roomId || !roomData) return;
+      // Only host can start
+      if (roomData.host_username !== userData?.username) return;
+
       setLoading(true);
       try {
          const batch = writeBatch(db);
-         
-         // Fill Bots
          const currentCount = players.length;
          const botsNeeded = GAME_CONFIG.MAX_PLAYERS - currentCount;
          
+         // Helper to get unique random name
+         const usedNames = new Set(players.map(p => p.username));
+         const availableNames = NAMES_LIST.filter(n => !usedNames.has(n));
+         
          for(let i=0; i < botsNeeded; i++) {
-             const botId = `bot-${i}`;
-             const botRef = doc(db, 'rooms', roomId, 'players', botId);
+             // Fallback to bot-i if we run out of names
+             let botName = `Bot-${i+1}`;
+             if (availableNames.length > 0) {
+                 const rIdx = Math.floor(Math.random() * availableNames.length);
+                 botName = availableNames[rIdx];
+                 availableNames.splice(rIdx, 1);
+             }
+
+             const botRef = doc(db, 'rooms', roomId, 'players', botName);
              const botData: FirestorePlayer = {
+                ...getInitialPlayerState(),
                 is_bot: true,
-                connection_status: 'CONNECTED',
-                hp: GAME_CONFIG.START_HP,
-                hunger: GAME_CONFIG.START_HUNGER,
-                fatigue: GAME_CONFIG.START_FATIGUE,
-                inventory: [],
-                pending_action: { type: 'NONE', target: null }
+                avatar_id: Math.floor(Math.random() * 1000) + 1
              };
              batch.set(botRef, botData);
          }
 
-         // Update Room Status
-         const roomRef = doc(db, 'rooms', roomId);
-         batch.update(roomRef, { 
+         batch.update(doc(db, 'rooms', roomId), { 
              status: 'IN_PROGRESS',
-             next_phase_time: serverTimestamp() // Logic should calculate actual time + offset
+             player_count: 24, // Filled
+             next_phase_time: serverTimestamp() 
          });
 
          await batch.commit();
       } catch (err: any) {
-          setError(err.message);
+          handleFirebaseError(err);
       } finally {
           setLoading(false);
       }
@@ -195,27 +278,59 @@ export const useGameRoom = () => {
 
   const leaveRoom = async () => {
       if (!roomId || !userData) return;
-      // If lobby -> remove player. If game -> mark disconnected/dead?
-      // For now, simple clear session
-      await updateDoc(doc(db, 'users', userData.username), { active_session_id: null });
-      setRoomId(null);
-      setRoomData(null);
+      
+      const targetRoomId = roomId;
+      const isHost = roomData?.host_username === userData.username;
+      const isLobby = roomData?.status === 'LOBBY';
+
+      try {
+          // 1. Clear session immediately so UI updates and Reconnect doesn't fire
+          await setDoc(doc(db, 'users', userData.username), { active_session_id: null }, { merge: true });
+          
+          if (targetRoomId && isLobby) {
+              if (isHost) {
+                  // HOST LEAVING LOBBY -> DESTROY ROOM
+                  await deleteDoc(doc(db, 'rooms', targetRoomId));
+              } else {
+                  // GUEST LEAVING LOBBY -> REMOVE PLAYER
+                  const batch = writeBatch(db);
+                  batch.delete(doc(db, 'rooms', targetRoomId, 'players', userData.username));
+                  batch.update(doc(db, 'rooms', targetRoomId), {
+                      player_count: increment(-1)
+                  });
+                  await batch.commit();
+              }
+          }
+
+          setRoomId(null);
+          setRoomData(null);
+          setPlayers([]);
+      } catch (e) {
+          console.error("Error leaving room:", e);
+      }
   };
 
   const attemptReconnect = async () => {
       if (!userData?.active_session_id) return false;
-      
       const code = userData.active_session_id;
-      const roomSnap = await getDoc(doc(db, 'rooms', code));
       
-      if (roomSnap.exists()) {
-          setRoomId(code);
-          // Restore Connection Status
-          await updateDoc(doc(db, 'rooms', code, 'players', userData.username), { connection_status: 'CONNECTED' });
-          return true;
-      } else {
-          // Room ended, clear session
-          await updateDoc(doc(db, 'users', userData.username), { active_session_id: null });
+      try {
+          const roomSnap = await getDoc(doc(db, 'rooms', code));
+          if (roomSnap.exists()) {
+              setRoomId(code);
+              // Mark connected
+              await updateDoc(doc(db, 'rooms', code, 'players', userData.username), { 
+                  connection_status: 'CONNECTED',
+                  last_active: Date.now()
+              });
+              return true;
+          } else {
+              // Clean up dead session
+              await setDoc(doc(db, 'users', userData.username), { active_session_id: null }, { merge: true });
+              return false;
+          }
+      } catch (e) {
+          console.error("Reconnect failed", e);
           return false;
       }
   };

@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useGameEngine } from './hooks/useGameEngine';
 import { Lobby } from './components/Lobby';
@@ -11,6 +12,7 @@ const App: React.FC = () => {
     submitAction, 
     useItem,
     leaveGame,
+    surrenderGame,
     pendingAction,
     sendChatMessage,
     closeModal
@@ -32,6 +34,7 @@ const App: React.FC = () => {
       onSendMessage={sendChatMessage}
       onEquipItem={useItem}
       onLeaveGame={leaveGame}
+      onSurrender={surrenderGame}
       onCloseModal={closeModal}
     />
   );

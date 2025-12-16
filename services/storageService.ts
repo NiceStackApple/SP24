@@ -1,21 +1,11 @@
 
-import { UserProfile, Account } from '../types';
+import { doc, getDoc, updateDoc, increment } from 'firebase/firestore';
+import { db, auth } from './firebase';
+import { UserProfile } from '../types';
 
-const ACCOUNTS_KEY = 'SP24_ACCOUNTS';
-const SESSION_KEY = 'SP24_SESSION_USER';
-
-// Simple synchronous hash function for prototype purposes (djb2)
-// In a real app, use bcrypt/argon2 on a backend.
-const simpleHash = (str: string): string => {
-  let hash = 5381;
-  for (let i = 0; i < str.length; i++) {
-    hash = ((hash << 5) + hash) + str.charCodeAt(i); /* hash * 33 + c */
-  }
-  return hash.toString(16);
-};
-
+// Legacy Types for fallback
 const DEFAULT_PROFILE: UserProfile = {
-  name: '',
+  name: 'Guest',
   avatarId: 99,
   matchesPlayed: 0,
   wins: 0,
@@ -24,116 +14,78 @@ const DEFAULT_PROFILE: UserProfile = {
 };
 
 class StorageService {
-  private accounts: Record<string, Account> = {};
-  private currentUser: string | null = null;
-
-  constructor() {
-    this.loadAccounts();
-    this.currentUser = localStorage.getItem(SESSION_KEY);
-  }
-
-  private loadAccounts() {
-    try {
-      const stored = localStorage.getItem(ACCOUNTS_KEY);
-      if (stored) {
-        this.accounts = JSON.parse(stored);
-      }
-    } catch (e) {
-      console.error('Failed to load accounts', e);
-      this.accounts = {};
-    }
-  }
-
-  private saveAccounts() {
-    try {
-      localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(this.accounts));
-    } catch (e) {
-      console.error('Failed to save accounts', e);
-    }
-  }
-
-  // --- AUTHENTICATION ---
-
-  register(username: string, pass: string, secondPass: string): { success: boolean; error?: string } {
-    if (!username || !pass || !secondPass) return { success: false, error: 'All fields required' };
-    if (this.accounts[username]) return { success: false, error: 'Username already taken' };
-
-    const newAccount: Account = {
-      username,
-      passwordHash: simpleHash(pass),
-      secondPasswordHash: simpleHash(secondPass),
-      profile: {
-        ...DEFAULT_PROFILE,
-        name: username,
-        avatarId: Math.floor(Math.random() * 70)
-      }
-    };
-
-    this.accounts[username] = newAccount;
-    this.saveAccounts();
-    return { success: true };
-  }
-
-  login(username: string, pass: string): { success: boolean; error?: string } {
-    const acc = this.accounts[username];
-    if (!acc) return { success: false, error: 'Account not found' };
-    
-    if (acc.passwordHash !== simpleHash(pass)) {
-      return { success: false, error: 'Incorrect password' };
-    }
-
-    this.currentUser = username;
-    localStorage.setItem(SESSION_KEY, username);
-    return { success: true };
-  }
-
-  logout() {
-    this.currentUser = null;
-    localStorage.removeItem(SESSION_KEY);
-  }
-
+  // Legacy method stubs to prevent crashing existing code calling them
+  // Auth is now handled by AuthContext
+  register() { return { success: false, error: 'Use AuthContext' }; }
+  login() { return { success: false, error: 'Use AuthContext' }; }
+  logout() { /* No-op, handled by AuthContext */ }
+  
   isLoggedIn(): boolean {
-    return !!this.currentUser && !!this.accounts[this.currentUser];
+    return !!auth.currentUser;
   }
 
   getCurrentUser(): UserProfile | null {
-    if (!this.currentUser || !this.accounts[this.currentUser]) return null;
-    return this.accounts[this.currentUser].profile;
+    if (!auth.currentUser) return null;
+    const email = auth.currentUser.email;
+    const name = email ? email.split('@')[0] : 'Unknown';
+    return { ...DEFAULT_PROFILE, name }; 
   }
 
-  // --- STATS ---
+  // --- STATS PERSISTENCE ---
 
+  async updateStats(stats: { won?: boolean; killed?: number; died?: boolean; days?: number }) {
+    const user = auth.currentUser;
+    if (!user || !user.email) return;
+
+    const username = user.email.split('@')[0];
+    const userRef = doc(db, 'users', username);
+
+    try {
+      await updateDoc(userRef, {
+        'stats.total_matches': increment(1),
+        'stats.wins': increment(stats.won ? 1 : 0),
+        'stats.kills': increment(stats.killed || 0),
+        'stats.days_survived': increment(stats.days || 0)
+      });
+    } catch (e) {
+      console.error("Failed to update stats:", e);
+    }
+  }
+
+  // Helper to get stats for Account Modal
+  async getProfileData(): Promise<UserProfile> {
+     const user = auth.currentUser;
+     if (!user || !user.email) return DEFAULT_PROFILE;
+
+     const username = user.email.split('@')[0];
+     try {
+        const snap = await getDoc(doc(db, 'users', username));
+        if (snap.exists()) {
+            const data = snap.data();
+            return {
+                name: username,
+                avatarId: 99, // Avatar Logic TBD
+                matchesPlayed: data.stats.total_matches || 0,
+                wins: data.stats.wins || 0,
+                kills: data.stats.kills || 0,
+                deaths: (data.stats.total_matches || 0) - (data.stats.wins || 0) // Approximation
+            };
+        }
+     } catch (e) {
+         console.error("Error fetching profile", e);
+     }
+     return { ...DEFAULT_PROFILE, name: username };
+  }
+
+  // Compat method for sync calls (returns partial data, async fetch preferred)
   getProfile(): UserProfile {
-    // Return current user profile or a dummy one if not logged in
-    const user = this.getCurrentUser();
-    return user || DEFAULT_PROFILE;
+     const user = auth.currentUser;
+     if (!user || !user.email) return DEFAULT_PROFILE;
+     return { ...DEFAULT_PROFILE, name: user.email.split('@')[0] };
   }
-
-  saveProfile(updates: Partial<UserProfile>) {
-    if (!this.currentUser || !this.accounts[this.currentUser]) return;
-    
-    // Update the profile in the account
-    this.accounts[this.currentUser].profile = {
-      ...this.accounts[this.currentUser].profile,
-      ...updates
-    };
-    this.saveAccounts();
-  }
-
-  updateStats(stats: { won?: boolean; killed?: number; died?: boolean }) {
-    if (!this.currentUser || !this.accounts[this.currentUser]) return;
-
-    const current = this.accounts[this.currentUser].profile;
-    const updated: UserProfile = {
-      ...current,
-      matchesPlayed: current.matchesPlayed + 1,
-      wins: current.wins + (stats.won ? 1 : 0),
-      kills: current.kills + (stats.killed || 0),
-      deaths: current.deaths + (stats.died ? 1 : 0),
-    };
-    
-    this.accounts[this.currentUser].profile = updated;
-    this.saveAccounts();
+  
+  saveProfile(updates?: Partial<UserProfile>) {
+      // Name changes handled via AuthContext/Firestore logic if needed
   }
 }
 

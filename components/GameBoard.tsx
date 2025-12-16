@@ -7,7 +7,7 @@ import { GameLog } from './GameLog';
 import { ChatPanel } from './ChatPanel';
 import { BattleAnimationLayer } from './BattleAnimationLayer';
 import { GlobalModal } from './GlobalModal';
-import { Clock, Sun, Moon, Eye, Heart, Skull, Loader, Flame, Biohazard, ShieldAlert, Ghost, AlertTriangle } from 'lucide-react';
+import { Clock, Sun, Moon, Eye, Heart, Skull, Loader, Flame, Biohazard, ShieldAlert, Ghost, AlertTriangle, LogOut } from 'lucide-react';
 
 interface GameBoardProps {
   state: GameState;
@@ -16,6 +16,7 @@ interface GameBoardProps {
   onSendMessage: (text: string, recipient?: string) => void;
   onEquipItem: (item: string) => void;
   onLeaveGame: () => void;
+  onSurrender: () => void;
   onCloseModal?: () => void;
 }
 
@@ -26,6 +27,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   onSendMessage,
   onEquipItem,
   onLeaveGame,
+  onSurrender,
   onCloseModal
 }) => {
   const me = state.players.find(p => p.id === state.myPlayerId);
@@ -34,6 +36,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   const [showDeathModal, setShowDeathModal] = useState(false);
   const [hasShownDeath, setHasShownDeath] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
+  const [showSurrenderModal, setShowSurrenderModal] = useState(false);
 
   useEffect(() => {
      if (me?.status === PlayerStatus.DEAD && state.phase !== Phase.GAME_OVER && !isLeaving && !hasShownDeath) {
@@ -63,6 +66,14 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     }, 1000);
   };
 
+  const handleSurrenderConfirm = () => {
+    setIsLeaving(true);
+    setShowSurrenderModal(false);
+    setTimeout(() => {
+       onSurrender();
+    }, 1000);
+  };
+
   const aliveCount = state.players.filter(p => p.status === 'ALIVE').length;
   const isVolcanoDay = state.day === state.volcanoDay;
   const isGasDay = state.day === state.gasDay;
@@ -84,8 +95,38 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         onClose={() => onCloseModal && onCloseModal()} 
       />
 
+      {/* SURRENDER MODAL */}
+      {showSurrenderModal && (
+         <div className="absolute inset-0 z-[80] bg-black/90 backdrop-blur-sm flex items-center justify-center animate-fade-in">
+           <div className="max-w-md w-full bg-gray-900 border border-gray-800 p-8 rounded-lg text-center shadow-2xl relative">
+              <AlertTriangle size={48} className="text-red-500 mx-auto mb-4 animate-pulse" />
+              <h2 className="text-2xl font-bold text-white mb-2 uppercase tracking-tighter">CONFIRM SURRENDER</h2>
+              <p className="text-gray-400 mb-6 font-mono text-sm leading-relaxed">
+                 Are you sure you want to abandon the match?<br/>
+                 <span className="text-red-500 font-bold">All stats gained will be lost.</span>
+                 <br/>This action is irreversible.
+              </p>
+              
+              <div className="flex gap-3">
+                 <button 
+                   onClick={() => setShowSurrenderModal(false)}
+                   className="flex-1 py-3 bg-transparent border border-gray-600 text-white font-mono hover:bg-gray-800 transition-colors uppercase tracking-widest"
+                 >
+                    CANCEL
+                 </button>
+                 <button 
+                   onClick={handleSurrenderConfirm}
+                   className="flex-1 py-3 bg-red-700 text-white font-mono hover:bg-red-800 transition-colors uppercase tracking-widest shadow-lg shadow-red-900/20"
+                 >
+                    SURRENDER
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
+
       {/* DEATH MODAL */}
-      {showDeathModal && !isLeaving && (
+      {showDeathModal && !isLeaving && !showSurrenderModal && (
         <div className="absolute inset-0 z-[60] bg-black/90 backdrop-blur-sm flex items-center justify-center animate-fade-in">
            <div className="max-w-md w-full bg-gray-900 border border-gray-800 p-8 rounded-lg text-center shadow-2xl relative overflow-hidden">
                {/* Red decorative line */}
@@ -363,8 +404,21 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           RIGHT COLUMN (COMMS) - 25%
       ========================================= */}
       <div className={`flex-1 flex flex-col h-full bg-gray-950 min-w-[300px] max-w-[400px] transition-opacity duration-500 ${(state.volcanoEventActive || state.gasEventActive || state.monsterEventActive) ? 'opacity-20 pointer-events-none' : 'opacity-100'}`}>
-         {/* CHAT (Top 60%) */}
-         <div className="h-[60%] flex flex-col">
+         
+         {/* --- TOP-RIGHT EXIT HEADER --- */}
+         <div className="h-16 bg-black border-b border-gray-800 flex items-center justify-end px-4 shrink-0">
+             <button 
+                onClick={() => setShowSurrenderModal(true)}
+                disabled={me?.status === PlayerStatus.DEAD}
+                className="flex items-center gap-2 bg-red-900/20 hover:bg-red-900/40 border border-red-900/50 text-red-500 px-3 py-1.5 rounded transition-all text-xs font-bold font-mono tracking-widest disabled:opacity-50 disabled:cursor-not-allowed group"
+             >
+                <LogOut size={14} className="group-hover:translate-x-0.5 transition-transform" />
+                EXIT MATCH
+             </button>
+         </div>
+
+         {/* CHAT (Top 60% minus header) */}
+         <div className="flex-1 flex flex-col overflow-hidden">
             <ChatPanel 
                messages={state.messages} 
                players={state.players} 
