@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { BattleEvent, ActionType } from '../types';
 import { Plus } from 'lucide-react';
@@ -12,12 +13,10 @@ export const BattleAnimationLayer: React.FC<Props> = ({ event }) => {
   const [animType, setAnimType] = useState<'GUN' | 'HEAL' | null>(null);
 
   useEffect(() => {
-    // Only animate Shoot and Heal here. Sword is now inside PlayerCard.
     if ((event?.type === ActionType.SHOOT || event?.type === ActionType.HEAL) && event.sourceId && event.targetId) {
       
       const isShoot = event.type === ActionType.SHOOT;
-      // Shoot is now instant, heal waits a bit
-      const delay = isShoot ? 50 : 1200; 
+      const delay = isShoot ? 50 : 200; 
 
       const delayTimer = setTimeout(() => {
           const sourceEl = document.getElementById(`player-card-${event.sourceId}`);
@@ -36,34 +35,37 @@ export const BattleAnimationLayer: React.FC<Props> = ({ event }) => {
             if (event.type === ActionType.SHOOT) {
                setAnimType('GUN');
                const angle = Math.atan2(endY - startY, endX - startX) * (180 / Math.PI);
+               const dist = Math.hypot(endX - startX, endY - startY);
                
                setVisible(true);
                setStyle({
                  transform: `translate(${startX}px, ${startY}px) rotate(${angle}deg)`,
-                 opacity: 0,
+                 opacity: 1,
                  transition: 'none',
-                 width: '12px',
-                 height: '2px', // Thinner line
-                 background: '#fbbf24', 
+                 width: '20px', // Projectile length
+                 height: '4px',
+                 background: '#fff', 
+                 boxShadow: '0 0 10px #fbbf24, 0 0 20px #fbbf24',
                  borderRadius: '2px',
-                 boxShadow: '0 0 5px #fbbf24'
+                 zIndex: 1000
                });
                
-               // Instant faint trace
+               // Bullet Travel
                setTimeout(() => {
                  setStyle({
                    transform: `translate(${endX}px, ${endY}px) rotate(${angle}deg)`,
-                   opacity: 0.4, // Faint
-                   transition: 'transform 150ms linear, opacity 100ms ease-out', 
-                   width: '12px',
-                   height: '2px',
-                   background: '#fbbf24',
+                   opacity: 1, 
+                   transition: 'transform 100ms linear', 
+                   width: '20px',
+                   height: '4px',
+                   background: '#fff',
+                   boxShadow: '0 0 10px #fbbf24',
                    borderRadius: '2px',
-                   boxShadow: '0 0 5px #fbbf24'
+                   zIndex: 1000
                  });
                }, 20);
 
-               setTimeout(() => setVisible(false), 200);
+               setTimeout(() => setVisible(false), 150);
 
             } else if (event.type === ActionType.HEAL) {
                setAnimType('HEAL');
@@ -73,37 +75,43 @@ export const BattleAnimationLayer: React.FC<Props> = ({ event }) => {
                  transform: `translate(${startX}px, ${startY}px) scale(0.5)`,
                  opacity: 0,
                  transition: 'none',
-                 color: '#4ade80'
+                 color: '#4ade80',
+                 zIndex: 1000
                });
                
+               // Spawn
                setTimeout(() => {
                   setStyle({
                     transform: `translate(${startX}px, ${startY}px) scale(1.5)`,
                     opacity: 1,
                     transition: 'transform 200ms ease-out, opacity 200ms ease-in',
-                    color: '#4ade80'
+                    color: '#4ade80',
+                    zIndex: 1000
                   });
                }, 50);
 
+               // Travel to Target
                setTimeout(() => {
                   setStyle({
                     transform: `translate(${endX}px, ${endY}px) scale(1)`,
-                    opacity: 0.8,
-                    transition: 'transform 400ms ease-in-out',
-                    color: '#4ade80'
+                    opacity: 1,
+                    transition: 'transform 600ms ease-in-out',
+                    color: '#4ade80',
+                    zIndex: 1000
                   });
                }, 250);
 
+               // Absorb
                setTimeout(() => {
                  setStyle(prev => ({
                    ...prev,
-                   transform: `translate(${endX}px, ${endY}px) scale(2)`,
+                   transform: `translate(${endX}px, ${endY - 30}px) scale(1.2)`,
                    opacity: 0,
-                   transition: 'transform 200ms ease-out, opacity 200ms ease-out'
+                   transition: 'transform 300ms ease-out, opacity 300ms ease-out'
                  }));
-               }, 650);
+               }, 850);
 
-               setTimeout(() => setVisible(false), 850);
+               setTimeout(() => setVisible(false), 1150);
             }
           }
       }, delay);
@@ -118,7 +126,7 @@ export const BattleAnimationLayer: React.FC<Props> = ({ event }) => {
 
   if (animType === 'GUN') {
      return (
-       <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
+       <div className="fixed inset-0 pointer-events-none z-[100] overflow-hidden">
          <div className="absolute" style={style} />
        </div>
      );
@@ -126,12 +134,12 @@ export const BattleAnimationLayer: React.FC<Props> = ({ event }) => {
 
   if (animType === 'HEAL') {
      return (
-       <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
+       <div className="fixed inset-0 pointer-events-none z-[100] overflow-hidden">
          <div 
-           className="absolute w-8 h-8 drop-shadow-[0_0_15px_rgba(74,222,128,0.8)]"
-           style={{ ...style, width: 32, height: 32, marginLeft: -16, marginTop: -16, transformOrigin: 'center' }} 
+           className="absolute flex items-center justify-center"
+           style={{ ...style, width: 32, height: 32, marginLeft: -16, marginTop: -16 }} 
          >
-           <Plus size={32} fill="currentColor" />
+           <Plus size={32} fill="currentColor" className="drop-shadow-[0_0_15px_rgba(74,222,128,1)]" />
          </div>
        </div>
      );

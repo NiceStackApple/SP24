@@ -1,14 +1,15 @@
+
 class AudioService {
   private ctx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
   private bgmNodes: AudioNode[] = [];
-  private isMuted: boolean = false;
+  private volume: number = 0.4;
 
   constructor() {
     try {
       this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
       this.masterGain = this.ctx.createGain();
-      this.masterGain.gain.value = 0.4; 
+      this.masterGain.gain.value = this.volume; 
       this.masterGain.connect(this.ctx.destination);
     } catch (e) {
       console.error("AudioContext not supported");
@@ -19,6 +20,13 @@ class AudioService {
     if (this.ctx?.state === 'suspended') {
       this.ctx.resume();
     }
+  }
+
+  public setMasterVolume(val: number) {
+      if (this.masterGain) {
+          this.volume = Math.max(0, Math.min(1, val));
+          this.masterGain.gain.setTargetAtTime(this.volume, this.ctx?.currentTime || 0, 0.1);
+      }
   }
 
   // --- SYNTHESIS HELPERS ---

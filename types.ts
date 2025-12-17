@@ -156,7 +156,7 @@ export interface ChatMessage {
 
 export interface BattleEvent {
   id: string;
-  type: ActionType | 'DEATH' | 'STUN_RECOVERY' | 'STUN' | 'VOLCANO' | 'POISON' | 'MONSTER';
+  type: ActionType | 'DEATH' | 'STUN_RECOVERY' | 'STUN' | 'VOLCANO' | 'POISON' | 'MONSTER' | 'ZONE_COLLAPSE';
   sourceId: string;
   targetId?: string;
   value?: number; 
@@ -194,9 +194,17 @@ export interface GameState {
   
   volcanoEventActive?: boolean;
   gasEventActive?: boolean;
+  zoneShrinkActive?: boolean;
   
   nextMonsterDay: number;
   monsterEventActive?: boolean;
+  
+  // WARNING STATE
+  activeWarning?: { title: string; subtitle: string; theme: 'VOLCANO' | 'ACID' | 'ZONE' | 'MONSTER' } | null;
+
+  // PRACTICE ADMIN FLAGS
+  adminNoCost?: boolean;
+  forceEventType?: 'VOLCANO' | 'GAS' | 'MONSTER' | 'SHRINK' | 'PISTOL' | null;
 }
 
 export interface ActionPayload {

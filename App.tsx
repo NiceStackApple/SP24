@@ -16,7 +16,13 @@ const App: React.FC = () => {
     claimVictory,
     pendingAction,
     sendChatMessage,
-    closeModal
+    closeModal,
+    // Admin
+    adminSetDay,
+    adminTriggerEvent,
+    adminKillPlayer,
+    adminToggleNoCost,
+    adminWinGame
   } = useGameEngine();
 
   const handleActionSelect = (type: ActionType, targetId?: string) => {
@@ -38,6 +44,12 @@ const App: React.FC = () => {
       onSurrender={surrenderGame}
       onCloseModal={closeModal}
       onClaimVictory={claimVictory}
+      // Admin
+      adminSetDay={adminSetDay}
+      adminTriggerEvent={adminTriggerEvent}
+      adminKillPlayer={adminKillPlayer}
+      adminToggleNoCost={adminToggleNoCost}
+      adminWinGame={adminWinGame}
     />
   );
 };

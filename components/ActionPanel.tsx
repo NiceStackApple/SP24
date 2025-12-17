@@ -12,6 +12,7 @@ interface ActionPanelProps {
   pendingAction: { type: ActionType, targetId?: string | null };
   onActionSelect: (type: ActionType) => void;
   onUseItem: (item: string) => void;
+  adminNoCost?: boolean;
 }
 
 export const ActionPanel: React.FC<ActionPanelProps> = ({ 
@@ -20,7 +21,8 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
   day,
   pendingAction,
   onActionSelect,
-  onUseItem
+  onUseItem,
+  adminNoCost
 }) => {
   const [showBag, setShowBag] = useState(false);
   const [hasNewItems, setHasNewItems] = useState(false);
@@ -178,8 +180,14 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
         const isActive = pendingAction.type === act.type;
         
         // Strict Cost Logic
-        const costH = act.isGain ? 0 : act.hunger;
-        const costF = act.isGain ? 0 : act.fatigue;
+        let costH = act.isGain ? 0 : act.hunger;
+        let costF = act.isGain ? 0 : act.fatigue;
+        
+        if (adminNoCost) {
+            costH = 0;
+            costF = 0;
+        }
+
         const hasStats = player.hunger >= costH && player.fatigue >= costF;
 
         // Stun Logic: If stunned, only Eat/Rest allowed
@@ -187,7 +195,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
         const isBlockedByStun = isStunned && !isAllowedWhileStunned;
 
         // @ts-ignore
-        const isDisabled = isBlockedByStun || !hasStats || (act.cooldown && act.cooldown > 0) || (act.disabledCondition);
+        const isDisabled = !adminNoCost && (isBlockedByStun || !hasStats || (act.cooldown && act.cooldown > 0) || (act.disabledCondition));
         
         return (
           <button
@@ -210,32 +218,32 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
                <div className="text-[9px] font-mono text-gray-300 truncate leading-none">{act.desc}</div>
                <div className="flex justify-center gap-2 text-[9px] font-mono font-bold">
                   {act.hunger !== 0 && (
-                      <span className={act.isGain ? 'text-green-500' : (player.hunger < act.hunger ? 'text-red-600 animate-pulse' : 'text-orange-500')}>
-                         {act.isGain ? '+' : '-'}{Math.abs(act.hunger)}H
+                      <span className={act.isGain ? 'text-green-500' : (player.hunger < act.hunger && !adminNoCost ? 'text-red-600 animate-pulse' : 'text-orange-500')}>
+                         {act.isGain ? '+' : '-'}{Math.abs(adminNoCost ? 0 : act.hunger)}H
                       </span>
                   )}
                   {act.fatigue !== 0 && (
-                      <span className={act.isGain ? 'text-green-500' : (player.fatigue < act.fatigue ? 'text-red-600 animate-pulse' : 'text-blue-500')}>
-                         {act.isGain ? '+' : '-'}{Math.abs(act.fatigue)}F
+                      <span className={act.isGain ? 'text-green-500' : (player.fatigue < act.fatigue && !adminNoCost ? 'text-red-600 animate-pulse' : 'text-blue-500')}>
+                         {act.isGain ? '+' : '-'}{Math.abs(adminNoCost ? 0 : act.fatigue)}F
                       </span>
                   )}
                </div>
             </div>
             {/* @ts-ignore */}
-            {act.cooldown && act.cooldown > 0 && (
+            {act.cooldown && act.cooldown > 0 && !adminNoCost && (
                 <div className="absolute inset-0 bg-black/80 flex items-center justify-center rounded-md backdrop-blur-[1px]">
                   <span className="text-sm font-bold text-white font-mono">CD: {act.cooldown}d</span>
                 </div>
             )}
             {/* Stun Overlay */}
-            {isBlockedByStun && (
+            {isBlockedByStun && !adminNoCost && (
                 <div className="absolute inset-0 bg-black/80 flex items-center justify-center rounded-md backdrop-blur-[1px] z-20">
                   <span className="text-sm font-bold text-red-500 font-mono">STUNNED</span>
                 </div>
             )}
             {/* Lockdown Overlay */}
             {/* @ts-ignore */}
-            {act.disabledCondition && isLockdown && (
+            {act.disabledCondition && isLockdown && !adminNoCost && (
                 <div className="absolute inset-0 bg-black/80 flex items-center justify-center rounded-md backdrop-blur-[1px] z-20 border border-red-900/50">
                   <span className="text-sm font-bold text-red-500 font-mono">LOCKED</span>
                 </div>

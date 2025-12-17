@@ -9,10 +9,15 @@ interface GameLogProps {
 }
 
 export const GameLog: React.FC<GameLogProps> = ({ logs, myPlayerId }) => {
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
+  // FIX: Use scrollTop instead of scrollIntoView to prevent viewport shifting
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (containerRef.current) {
+      const { scrollHeight, clientHeight } = containerRef.current;
+      // Scroll to bottom
+      containerRef.current.scrollTop = scrollHeight - clientHeight;
+    }
   }, [logs]);
 
   const getLogColor = (type: LogEntry['type']) => {
@@ -36,7 +41,10 @@ export const GameLog: React.FC<GameLogProps> = ({ logs, myPlayerId }) => {
         <h3 className="text-xs font-mono text-gray-400 uppercase tracking-widest">Activity Log</h3>
       </div>
       
-      <div className="flex-1 overflow-y-auto p-4 space-y-1 font-mono text-xs custom-scrollbar">
+      <div 
+        ref={containerRef}
+        className="flex-1 overflow-y-auto p-4 space-y-1 font-mono text-xs custom-scrollbar"
+      >
         {logs.length === 0 && <div className="text-gray-700 italic text-center mt-4">Monitoring arena events...</div>}
         {logs.map((log) => {
           const isInvolved = myPlayerId && log.involvedIds?.includes(myPlayerId);
@@ -56,7 +64,6 @@ export const GameLog: React.FC<GameLogProps> = ({ logs, myPlayerId }) => {
             </div>
           );
         })}
-        <div ref={bottomRef} />
       </div>
     </div>
   );
