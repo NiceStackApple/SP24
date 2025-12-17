@@ -7,7 +7,7 @@ import { GameLog } from './GameLog';
 import { ChatPanel } from './ChatPanel';
 import { BattleAnimationLayer } from './BattleAnimationLayer';
 import { GlobalModal } from './GlobalModal';
-import { Clock, Sun, Moon, Eye, Heart, Skull, Loader, Flame, Biohazard, ShieldAlert, Ghost, AlertTriangle, LogOut } from 'lucide-react';
+import { Clock, Sun, Moon, Eye, Heart, Skull, Loader, Flame, Biohazard, ShieldAlert, Ghost, AlertTriangle, LogOut, Trophy } from 'lucide-react';
 
 interface GameBoardProps {
   state: GameState;
@@ -18,6 +18,8 @@ interface GameBoardProps {
   onLeaveGame: () => void;
   onSurrender: () => void;
   onCloseModal?: () => void;
+  // NEW: Claim Logic
+  onClaimVictory?: () => void;
 }
 
 export const GameBoard: React.FC<GameBoardProps> = ({ 
@@ -28,7 +30,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   onEquipItem,
   onLeaveGame,
   onSurrender,
-  onCloseModal
+  onCloseModal,
+  onClaimVictory
 }) => {
   const me = state.players.find(p => p.id === state.myPlayerId);
   const isDay = state.phase === Phase.DAY;
@@ -37,10 +40,23 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   const [hasShownDeath, setHasShownDeath] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
   const [showSurrenderModal, setShowSurrenderModal] = useState(false);
+  
+  // Victory State
+  const [cleanupTimer, setCleanupTimer] = useState(45);
+  const isWinner = state.phase === Phase.GAME_OVER && state.winnerId === state.myPlayerId;
+
+  // Cleanup Countdown
+  useEffect(() => {
+    if (state.phase === Phase.GAME_OVER) {
+       const timer = setInterval(() => {
+           setCleanupTimer(prev => Math.max(0, prev - 1));
+       }, 1000);
+       return () => clearInterval(timer);
+    }
+  }, [state.phase]);
 
   useEffect(() => {
      if (me?.status === PlayerStatus.DEAD && state.phase !== Phase.GAME_OVER && !isLeaving && !hasShownDeath) {
-        // If just died, show modal after delay - ONLY ONCE
         const timer = setTimeout(() => {
            setShowDeathModal(true);
            setHasShownDeath(true);
@@ -50,7 +66,6 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   }, [me?.status, state.phase, isLeaving, hasShownDeath]);
 
   const handlePlayerClick = (targetId: string) => {
-    // Lock interaction if Volcano Event Active
     if (state.volcanoEventActive) return;
 
     if (pendingAction.type === ActionType.ATTACK || pendingAction.type === ActionType.SHOOT || pendingAction.type === ActionType.HEAL) {
@@ -73,6 +88,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({
        onSurrender();
     }, 1000);
   };
+  
+  const handleClaim = () => {
+      setIsLeaving(true);
+      if (onClaimVictory) onClaimVictory();
+      else onLeaveGame();
+  };
 
   const aliveCount = state.players.filter(p => p.status === 'ALIVE').length;
   const isVolcanoDay = state.day === state.volcanoDay;
@@ -80,7 +101,6 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   const isZoneDay = state.day === 20 || state.day === 30 || state.day === 45;
   const isMonsterDay = state.day === state.nextMonsterDay;
 
-  // WARNING LOGIC
   const isVolcanoWarning = state.day === state.volcanoDay - 1;
   const isGasWarning = state.day === state.gasDay - 1;
 
@@ -95,8 +115,36 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         onClose={() => onCloseModal && onCloseModal()} 
       />
 
+      {/* VICTORY MODAL */}
+      {isWinner && (
+         <div className="absolute inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center animate-fade-in">
+             <div className="text-center">
+                 <Trophy size={96} className="text-yellow-500 mx-auto mb-6 animate-bounce drop-shadow-[0_0_50px_rgba(234,179,8,0.8)]" />
+                 <h1 className="text-6xl font-black text-white tracking-tighter uppercase mb-2">VICTORY</h1>
+                 <p className="text-xl text-yellow-500 font-mono tracking-widest mb-8">SURVIVOR: {me?.name}</p>
+                 
+                 <div className="bg-gray-900 border border-gray-700 p-8 rounded-xl max-w-md mx-auto shadow-2xl relative overflow-hidden">
+                     <div className="absolute top-0 left-0 w-full h-1 bg-yellow-500 animate-[loading_45s_linear]"></div>
+                     
+                     <p className="text-gray-400 font-mono text-sm mb-6">
+                        Protocol complete. You have successfully eliminated all threats.
+                        <br/><br/>
+                        <span className="text-red-500">Auto-Termination in {cleanupTimer}s</span>
+                     </p>
+                     
+                     <button 
+                        onClick={handleClaim}
+                        className="w-full py-4 bg-yellow-600 hover:bg-yellow-700 text-black font-bold font-mono tracking-[0.2em] rounded shadow-lg shadow-yellow-900/50 uppercase transition-all hover:scale-105"
+                     >
+                        CLAIM REWARD & EXIT
+                     </button>
+                 </div>
+             </div>
+         </div>
+      )}
+
       {/* SURRENDER MODAL */}
-      {showSurrenderModal && (
+      {showSurrenderModal && !isWinner && (
          <div className="absolute inset-0 z-[80] bg-black/90 backdrop-blur-sm flex items-center justify-center animate-fade-in">
            <div className="max-w-md w-full bg-gray-900 border border-gray-800 p-8 rounded-lg text-center shadow-2xl relative">
               <AlertTriangle size={48} className="text-red-500 mx-auto mb-4 animate-pulse" />
@@ -126,7 +174,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       )}
 
       {/* DEATH MODAL */}
-      {showDeathModal && !isLeaving && !showSurrenderModal && (
+      {showDeathModal && !isLeaving && !showSurrenderModal && !isWinner && (
         <div className="absolute inset-0 z-[60] bg-black/90 backdrop-blur-sm flex items-center justify-center animate-fade-in">
            <div className="max-w-md w-full bg-gray-900 border border-gray-800 p-8 rounded-lg text-center shadow-2xl relative overflow-hidden">
                {/* Red decorative line */}
@@ -156,7 +204,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
       {/* LEAVING LOADER */}
       {isLeaving && (
-         <div className="absolute inset-0 z-[70] bg-black flex flex-col items-center justify-center">
+         <div className="absolute inset-0 z-[120] bg-black flex flex-col items-center justify-center">
             <Loader className="text-white animate-spin mb-4" size={32} />
             <p className="text-gray-400 font-mono tracking-widest animate-pulse">TERMINATING SESSION...</p>
          </div>
@@ -409,7 +457,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
          <div className="h-16 bg-black border-b border-gray-800 flex items-center justify-end px-4 shrink-0">
              <button 
                 onClick={() => setShowSurrenderModal(true)}
-                disabled={me?.status === PlayerStatus.DEAD}
+                disabled={me?.status === PlayerStatus.DEAD || isWinner}
                 className="flex items-center gap-2 bg-red-900/20 hover:bg-red-900/40 border border-red-900/50 text-red-500 px-3 py-1.5 rounded transition-all text-xs font-bold font-mono tracking-widest disabled:opacity-50 disabled:cursor-not-allowed group"
              >
                 <LogOut size={14} className="group-hover:translate-x-0.5 transition-transform" />

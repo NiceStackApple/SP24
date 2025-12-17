@@ -130,12 +130,15 @@ export interface Player {
   // UI Helper
   lastExploreDay?: number;
   pendingActionType?: ActionType; // Helper for UI
+  connection_status?: 'CONNECTED' | 'DISCONNECTED';
 }
+
+export type LogType = 'system' | 'damage' | 'defense' | 'heal' | 'rest' | 'eat' | 'death' | 'item';
 
 export interface LogEntry {
   id: string;
   text: string;
-  type: 'info' | 'combat' | 'death' | 'system';
+  type: LogType;
   day: number;
   involvedIds?: string[];
 }
@@ -182,6 +185,7 @@ export interface GameState {
   currentEvent: BattleEvent | null;
   roomCode: string | null;
   isHost: boolean;
+  isPractice: boolean; // NEW FLAG
   modal: ModalState;
   
   volcanoDay: number; 

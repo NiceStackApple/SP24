@@ -13,6 +13,7 @@ const App: React.FC = () => {
     useItem,
     leaveGame,
     surrenderGame,
+    claimVictory,
     pendingAction,
     sendChatMessage,
     closeModal
@@ -36,6 +37,7 @@ const App: React.FC = () => {
       onLeaveGame={leaveGame}
       onSurrender={surrenderGame}
       onCloseModal={closeModal}
+      onClaimVictory={claimVictory}
     />
   );
 };

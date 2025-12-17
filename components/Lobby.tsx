@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Play, Users, Lock, User, Trophy, FileText, LogOut, Loader, AlertCircle, ArrowLeft, Plus } from 'lucide-react';
+import { Play, Users, Lock, User, Trophy, FileText, LogOut, Loader, AlertCircle, ArrowLeft, Plus, RefreshCw, Zap } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useGameRoom } from '../hooks/useGameRoom';
 import { AccountModal } from './AccountModal';
@@ -8,12 +8,12 @@ import { AuthForms } from './AuthForms';
 import { TipsChat } from './TipsChat';
 import { UpdateLogModal } from './UpdateLogModal';
 import { storageService } from '../services/storageService';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { RoomDocument, Phase } from '../types';
 
 interface LobbyProps {
-  onStart: (name: string, roomCode?: string, isHost?: boolean, roster?: string[], day?: number, phase?: Phase) => void;
+  onStart: (name: string, roomCode?: string, isHost?: boolean, roster?: string[], day?: number, phase?: Phase, isPractice?: boolean) => void;
 }
 
 export const Lobby: React.FC<LobbyProps> = ({ onStart }) => {
@@ -67,32 +67,37 @@ export const Lobby: React.FC<LobbyProps> = ({ onStart }) => {
                  isHost, 
                  rosterNames, 
                  roomData.current_day, 
-                 roomData.phase
+                 roomData.phase as Phase,
+                 false // Not Practice
              );
           }
       }
   }, [roomId, roomData, players, userData]);
 
-  // Room Browser Listener
+  // Manual Fetch for Browser (Saves Quota vs onSnapshot)
+  const refreshBrowser = async () => {
+      if (mode !== 'BROWSER') return;
+      setBrowserLoading(true);
+      try {
+          const q = query(
+            collection(db, 'rooms'),
+            where('is_public', '==', true),
+            where('status', '==', 'LOBBY')
+          );
+          const snap = await getDocs(q);
+          const rooms: any[] = [];
+          snap.forEach(d => rooms.push({ id: d.id, ...d.data() }));
+          setBrowserRooms(rooms);
+      } catch (err) {
+          console.error("Browser error", err);
+      } finally {
+          setBrowserLoading(false);
+      }
+  };
+
   useEffect(() => {
     if (mode === 'BROWSER') {
-      setBrowserLoading(true);
-      const q = query(
-        collection(db, 'rooms'),
-        where('is_public', '==', true),
-        where('status', '==', 'LOBBY')
-      );
-      
-      const unsub = onSnapshot(q, (snap) => {
-         const rooms: any[] = [];
-         snap.forEach(d => rooms.push({ id: d.id, ...d.data() }));
-         setBrowserRooms(rooms);
-         setBrowserLoading(false);
-      }, (err) => {
-         console.error("Browser error", err);
-         setBrowserLoading(false);
-      });
-      return () => unsub();
+        refreshBrowser();
     }
   }, [mode]);
 
@@ -102,6 +107,13 @@ export const Lobby: React.FC<LobbyProps> = ({ onStart }) => {
 
   const handlePlayClick = () => {
     setMode('BROWSER');
+  };
+
+  const handlePracticeClick = () => {
+    if (userData?.username) {
+        // Start Practice Mode immediately
+        onStart(userData.username, 'PRACTICE', true, [], 1, Phase.DAY, true);
+    }
   };
 
   const handleBackToMenu = () => {
@@ -272,6 +284,14 @@ export const Lobby: React.FC<LobbyProps> = ({ onStart }) => {
                               <Play size={24} className="fill-current group-hover:scale-110 transition-transform" />
                               <span>PLAY</span>
                             </button>
+
+                            <button 
+                              onClick={handlePracticeClick}
+                              className="w-full py-4 rounded-lg font-bold text-lg tracking-[0.2em] transition-all flex items-center justify-center space-x-3 bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-gray-500 text-gray-300 group"
+                            >
+                              <Zap size={20} className="text-yellow-500 group-hover:scale-110 transition-transform" />
+                              <span>PRACTICE</span>
+                            </button>
                         </div>
                       )}
 
@@ -302,16 +322,30 @@ export const Lobby: React.FC<LobbyProps> = ({ onStart }) => {
                                      <AlertCircle size={24} className="opacity-50" />
                                      <div className="text-center">
                                          <p className="text-xs font-mono mb-2">NO ACTIVE SIGNALS DETECTED</p>
-                                         <button 
-                                            onClick={() => setMode('CREATE')}
-                                            className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs rounded border border-gray-600 font-mono tracking-wider"
-                                         >
-                                            INITIALIZE NEW PROTOCOL
-                                         </button>
+                                         <div className="flex gap-2 justify-center">
+                                            <button 
+                                                onClick={refreshBrowser}
+                                                className="px-3 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs rounded border border-gray-600 font-mono flex items-center gap-1"
+                                            >
+                                                <RefreshCw size={10} /> REFRESH
+                                            </button>
+                                            <button 
+                                                onClick={() => setMode('CREATE')}
+                                                className="px-3 py-1 bg-yellow-900/20 hover:bg-yellow-900/40 text-yellow-500 text-xs rounded border border-yellow-800 font-mono"
+                                            >
+                                                CREATE
+                                            </button>
+                                         </div>
                                      </div>
                                  </div>
                               ) : (
-                                 browserRooms.map(room => (
+                                 <>
+                                 <div className="flex justify-end mb-2">
+                                    <button onClick={refreshBrowser} className="text-[10px] text-gray-400 hover:text-white flex items-center gap-1">
+                                        <RefreshCw size={10} /> REFRESH LIST
+                                    </button>
+                                 </div>
+                                 {browserRooms.map(room => (
                                      <button
                                         key={room.id}
                                         onClick={() => joinRoom(room.id)}
@@ -330,7 +364,8 @@ export const Lobby: React.FC<LobbyProps> = ({ onStart }) => {
                                             <Play size={14} className="text-gray-600 group-hover:text-white" />
                                         </div>
                                      </button>
-                                 ))
+                                 ))}
+                                 </>
                               )}
                            </div>
 

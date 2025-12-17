@@ -2,9 +2,9 @@
 import { useState, useEffect } from 'react';
 import { 
     doc, setDoc, getDoc, updateDoc, onSnapshot, collection, 
-    query, where, getDocs, writeBatch, serverTimestamp, increment, deleteDoc 
+    writeBatch, serverTimestamp, increment, getDocs, deleteDoc 
 } from 'firebase/firestore';
-import { ref, onDisconnect, set, remove } from 'firebase/database';
+import { ref, onDisconnect, set } from 'firebase/database';
 import { db, rtdb } from '../services/firebase';
 import { useAuth } from '../context/AuthContext';
 import { RoomDocument, FirestorePlayer, Phase, PlayerStatus } from '../types';
@@ -26,18 +26,19 @@ export const useGameRoom = () => {
         return;
     }
 
+    const currentUsername = userData?.username;
+
     // Listen to Room Doc
     const roomUnsub = onSnapshot(doc(db, 'rooms', roomId), (docSnap) => {
        if (docSnap.exists()) {
            setRoomData(docSnap.data() as RoomDocument);
        } else {
-           // Room deleted or doesn't exist -> Kick user to menu
+           console.log("Room deleted or invalid, resetting state.");
            setRoomId(null);
            setRoomData(null);
            setPlayers([]);
-           // Ensure session is cleared if we get kicked
-           if (userData?.username) {
-              setDoc(doc(db, 'users', userData.username), { active_session_id: null }, { merge: true });
+           if (currentUsername) {
+              setDoc(doc(db, 'users', currentUsername), { active_session_id: null }, { merge: true });
            }
        }
     }, (err) => {
@@ -63,7 +64,7 @@ export const useGameRoom = () => {
         roomUnsub();
         playersUnsub();
     };
-  }, [roomId, userData]); // Added userData dependency for session clear
+  }, [roomId, userData?.username]); 
 
   // --- PRESENCE SYSTEM ---
   useEffect(() => {
@@ -73,54 +74,44 @@ export const useGameRoom = () => {
     const presenceRef = ref(rtdb, `rooms/${roomId}/players/${username}`);
     const firestorePlayerRef = doc(db, 'rooms', roomId, 'players', username);
 
-    // Set RTDB presence to online
     set(presenceRef, { status: 'online', last_changed: Date.now() });
-
-    // On Disconnect: remove RTDB node
     onDisconnect(presenceRef).remove();
 
-    // Heartbeat logic could go here, but for now we rely on explicit actions
-    // Mark as CONNECTED in Firestore on mount
     updateDoc(firestorePlayerRef, { 
         connection_status: 'CONNECTED',
         last_active: Date.now()
     }).catch(console.error);
+  }, [roomId, userData?.username]);
 
-    return () => {
-        // We do NOT mark disconnected here to handle page refreshes gracefully
-        // The RTDB onDisconnect handles the actual "tab closed" scenario detection for other clients
-    };
-  }, [roomId, userData]);
-
-  // --- HOST RECONCILIATION (SINGLE SOURCE OF TRUTH) ---
-  useEffect(() => {
-    if (!roomId || !roomData || !userData) return;
-    
-    // Only Host performs reconciliation to avoid write contention
-    if (roomData.host_username !== userData.username) return;
-    
-    // Only strictly needed in Lobby for public listing accuracy
-    // Once game starts, bots are added and count is managed differently
-    if (roomData.status !== 'LOBBY') return;
-
-    const realCount = players.length;
-    
-    // If mismatch detected, correct it
-    // This self-heals any failed 'increment' operations from leaving players
-    if (roomData.player_count !== realCount) {
-        console.log(`Reconciling player count: ${roomData.player_count} -> ${realCount}`);
-        updateDoc(doc(db, 'rooms', roomId), {
-            player_count: realCount
-        }).catch(console.error);
-    }
-  }, [players.length, roomData?.player_count, roomId, roomData?.host_username, userData?.username, roomData?.status]);
-
-  // --- ACTIONS ---
+  const destroyRoom = async (targetRoomId: string) => {
+      try {
+          console.log(`Destroying room ${targetRoomId}...`);
+          
+          // 1. Delete all players in subcollection
+          const playersRef = collection(db, 'rooms', targetRoomId, 'players');
+          const playerSnaps = await getDocs(playersRef);
+          
+          const batch = writeBatch(db);
+          playerSnaps.forEach((doc) => {
+              batch.delete(doc.ref);
+          });
+          
+          // 2. Delete the room document
+          batch.delete(doc(db, 'rooms', targetRoomId));
+          
+          await batch.commit();
+          console.log("Room destroyed successfully.");
+      } catch (e) {
+          console.error("Failed to destroy room", e);
+      }
+  };
 
   const handleFirebaseError = (err: any) => {
       console.error(err);
       if (err.code === 'permission-denied') {
           setError("Access Denied: Please set Firestore Security Rules to public (test mode) in Firebase Console.");
+      } else if (err.message === "Request timed out") {
+          setError("Network Timeout: Unable to create room. Please try again.");
       } else {
           setError(err.message || "An unexpected error occurred.");
       }
@@ -135,7 +126,7 @@ export const useGameRoom = () => {
     fatigue: GAME_CONFIG.START_FATIGUE,
     inventory: [],
     pending_action: { type: 'NONE', target: null },
-    status: PlayerStatus.ALIVE,
+    status: 'ALIVE' as PlayerStatus, // Cast string literal to Type for TS satisfaction, avoids Enum runtime access
     cooldowns: { eat: 0, rest: 0, run: 0, shoot: 0, eatCount: 0, restCount: 0 },
     active_buffs: { damageBonus: 0, ignoreFatigue: false },
     last_explore_day: 0,
@@ -145,7 +136,7 @@ export const useGameRoom = () => {
   });
 
   const createRoom = async (isPublic: boolean) => {
-    if (!userData) {
+    if (!userData?.username) {
         setError("User data not loaded. Please wait or re-login.");
         return;
     }
@@ -154,28 +145,36 @@ export const useGameRoom = () => {
     try {
         const code = Math.random().toString(36).substring(2, 7).toUpperCase();
         
-        const newRoom: RoomDocument = {
+        // SAFE SCHEMA: Use string literals instead of Enums to prevent runtime resolution failures
+        const newRoom = {
             room_name: `${userData.username}'s Lobby`,
             host_username: userData.username,
             is_public: isPublic,
             player_count: 1,
             status: 'LOBBY',
             current_day: 1,
-            phase: Phase.DAY,
+            phase: 'DAY', // Hardcoded 'DAY'
             next_phase_time: null,
             events: []
         };
 
         const hostPlayer = getInitialPlayerState();
+        // Force status string to ensure it's valid
+        hostPlayer.status = 'ALIVE' as PlayerStatus; 
 
         const batch = writeBatch(db);
         batch.set(doc(db, 'rooms', code), newRoom);
         batch.set(doc(db, 'rooms', code, 'players', userData.username), hostPlayer);
-        
-        // Use set with merge: true for robustness
         batch.set(doc(db, 'users', userData.username), { active_session_id: code }, { merge: true });
 
-        await batch.commit();
+        // TIMEOUT WRAPPER for safety
+        const commitPromise = batch.commit();
+        const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error("Request timed out")), 15000)
+        );
+
+        await Promise.race([commitPromise, timeoutPromise]);
+        
         setRoomId(code);
     } catch (err: any) {
         handleFirebaseError(err);
@@ -185,7 +184,7 @@ export const useGameRoom = () => {
   };
 
   const joinRoom = async (code: string) => {
-     if (!userData) {
+     if (!userData?.username) {
          setError("User data not loaded.");
          return;
      }
@@ -200,26 +199,27 @@ export const useGameRoom = () => {
          
          if (rData.status !== 'LOBBY') throw new Error("Match already in progress");
 
-         // Check if already in (rejoin logic handles this usually, but explicit join needs check)
          const playerRef = doc(db, 'rooms', code, 'players', userData.username);
          const playerSnap = await getDoc(playerRef);
 
          const batch = writeBatch(db);
          
          if (!playerSnap.exists()) {
-             // New Join
             const newPlayer = getInitialPlayerState();
             batch.set(playerRef, newPlayer);
             batch.update(roomRef, { player_count: increment(1) });
          } else {
-             // Re-join existing
              batch.update(playerRef, { connection_status: 'CONNECTED', last_active: Date.now() });
          }
          
-         // Use set with merge: true
          batch.set(doc(db, 'users', userData.username), { active_session_id: code }, { merge: true });
          
-         await batch.commit();
+         const commitPromise = batch.commit();
+         const timeoutPromise = new Promise((_, reject) => 
+             setTimeout(() => reject(new Error("Request timed out")), 15000)
+         );
+
+         await Promise.race([commitPromise, timeoutPromise]);
 
          setRoomId(code);
      } catch (err: any) {
@@ -231,7 +231,6 @@ export const useGameRoom = () => {
 
   const startGame = async () => {
       if (!roomId || !roomData) return;
-      // Only host can start
       if (roomData.host_username !== userData?.username) return;
 
       setLoading(true);
@@ -240,12 +239,10 @@ export const useGameRoom = () => {
          const currentCount = players.length;
          const botsNeeded = GAME_CONFIG.MAX_PLAYERS - currentCount;
          
-         // Helper to get unique random name
          const usedNames = new Set(players.map(p => p.username));
          const availableNames = NAMES_LIST.filter(n => !usedNames.has(n));
          
          for(let i=0; i < botsNeeded; i++) {
-             // Fallback to bot-i if we run out of names
              let botName = `Bot-${i+1}`;
              if (availableNames.length > 0) {
                  const rIdx = Math.floor(Math.random() * availableNames.length);
@@ -264,7 +261,7 @@ export const useGameRoom = () => {
 
          batch.update(doc(db, 'rooms', roomId), { 
              status: 'IN_PROGRESS',
-             player_count: 24, // Filled
+             player_count: 24, 
              next_phase_time: serverTimestamp() 
          });
 
@@ -277,22 +274,21 @@ export const useGameRoom = () => {
   };
 
   const leaveRoom = async () => {
-      if (!roomId || !userData) return;
+      if (!roomId || !userData?.username) return;
       
       const targetRoomId = roomId;
       const isHost = roomData?.host_username === userData.username;
       const isLobby = roomData?.status === 'LOBBY';
 
       try {
-          // 1. Clear session immediately so UI updates and Reconnect doesn't fire
           await setDoc(doc(db, 'users', userData.username), { active_session_id: null }, { merge: true });
           
-          if (targetRoomId && isLobby) {
+          if (isLobby) {
               if (isHost) {
-                  // HOST LEAVING LOBBY -> DESTROY ROOM
-                  await deleteDoc(doc(db, 'rooms', targetRoomId));
+                  // HOST LEAVE LOBBY -> DESTROY ROOM
+                  await destroyRoom(targetRoomId); 
               } else {
-                  // GUEST LEAVING LOBBY -> REMOVE PLAYER
+                  // CLIENT LEAVE LOBBY -> REMOVE PLAYER & DECREMENT COUNT
                   const batch = writeBatch(db);
                   batch.delete(doc(db, 'rooms', targetRoomId, 'players', userData.username));
                   batch.update(doc(db, 'rooms', targetRoomId), {
@@ -300,6 +296,17 @@ export const useGameRoom = () => {
                   });
                   await batch.commit();
               }
+          } else {
+              // IN-GAME LEAVE (Manual Exit) -> Mark Disconnected & Decrement Count
+              // Logic matches "On player leave... player_count = player_count - 1"
+              const batch = writeBatch(db);
+              batch.update(doc(db, 'rooms', targetRoomId, 'players', userData.username), {
+                  connection_status: 'DISCONNECTED'
+              });
+              batch.update(doc(db, 'rooms', targetRoomId), {
+                  player_count: increment(-1)
+              });
+              await batch.commit();
           }
 
           setRoomId(null);
@@ -318,14 +325,12 @@ export const useGameRoom = () => {
           const roomSnap = await getDoc(doc(db, 'rooms', code));
           if (roomSnap.exists()) {
               setRoomId(code);
-              // Mark connected
               await updateDoc(doc(db, 'rooms', code, 'players', userData.username), { 
                   connection_status: 'CONNECTED',
                   last_active: Date.now()
               });
               return true;
           } else {
-              // Clean up dead session
               await setDoc(doc(db, 'users', userData.username), { active_session_id: null }, { merge: true });
               return false;
           }
@@ -345,6 +350,7 @@ export const useGameRoom = () => {
     joinRoom,
     startGame,
     leaveRoom,
-    attemptReconnect
+    attemptReconnect,
+    destroyRoom 
   };
 };
