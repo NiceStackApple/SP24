@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
-import { Play, Users, Lock, User, Trophy, FileText, LogOut, Loader, AlertCircle, ArrowLeft, Plus, RefreshCw, Zap } from 'lucide-react';
+import { Play, Users, Lock, User, Trophy, FileText, LogOut, Loader, AlertCircle, ArrowLeft, Plus, RefreshCw, Zap, Info } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useGameRoom } from '../hooks/useGameRoom';
 import { AccountModal } from './AccountModal';
 import { AuthForms } from './AuthForms';
 import { TipsChat } from './TipsChat';
 import { UpdateLogModal } from './UpdateLogModal';
+import { CreditModal } from './CreditModal';
 import { storageService } from '../services/storageService';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../services/firebase';
@@ -35,6 +36,7 @@ export const Lobby: React.FC<LobbyProps> = ({ onStart }) => {
   const [inputCode, setInputCode] = useState('');
   const [showProfile, setShowProfile] = useState(false);
   const [showUpdates, setShowUpdates] = useState(false);
+  const [showCredits, setShowCredits] = useState(false);
   const [profileData, setProfileData] = useState<any>(null);
   
   // Browser State
@@ -151,6 +153,11 @@ export const Lobby: React.FC<LobbyProps> = ({ onStart }) => {
         onClose={() => setShowUpdates(false)}
       />
 
+      <CreditModal 
+        isOpen={showCredits}
+        onClose={() => setShowCredits(false)}
+      />
+
       <div className="relative z-10 max-w-7xl w-full flex gap-6">
         {/* Left Side: Leaderboard */}
         <div className="w-80 hidden xl:flex flex-col gap-4 h-[600px]">
@@ -177,12 +184,20 @@ export const Lobby: React.FC<LobbyProps> = ({ onStart }) => {
             </h1>
             <p className="text-gray-400 font-mono text-sm tracking-wide">MULTIPLAYER STRATEGY SIMULATION</p>
             
-            <div className="absolute top-0 left-0">
+            <div className="absolute top-0 left-0 flex gap-1">
                 <button 
                     onClick={() => setShowUpdates(true)}
                     className="p-2 text-gray-500 hover:text-white hover:bg-gray-800 rounded transition-colors flex flex-col items-center gap-1 group"
+                    title="Patch Notes"
                 >
                     <FileText size={20} />
+                </button>
+                <button 
+                    onClick={() => setShowCredits(true)}
+                    className="p-2 text-gray-500 hover:text-white hover:bg-gray-800 rounded transition-colors flex flex-col items-center gap-1 group"
+                    title="Credits"
+                >
+                    <Info size={20} />
                 </button>
             </div>
 
@@ -191,6 +206,7 @@ export const Lobby: React.FC<LobbyProps> = ({ onStart }) => {
                   <button 
                       onClick={() => setShowProfile(true)}
                       className="p-2 text-gray-500 hover:text-white hover:bg-gray-800 rounded transition-colors flex flex-col items-center gap-1 group"
+                      title="Profile"
                   >
                       <User size={20} />
                   </button>
@@ -199,6 +215,7 @@ export const Lobby: React.FC<LobbyProps> = ({ onStart }) => {
                    <button 
                       onClick={logout}
                       className="p-2 text-red-500 hover:text-red-400 hover:bg-red-900/30 rounded transition-colors flex flex-col items-center gap-1 group"
+                      title="Logout"
                   >
                       <LogOut size={20} />
                   </button>
@@ -450,6 +467,18 @@ export const Lobby: React.FC<LobbyProps> = ({ onStart }) => {
                 </>
              )}
           </div>
+          
+          {/* Discrete Credits at bottom */}
+          {!inLobby && user && mode === 'MENU' && (
+            <div className="mt-8 text-center">
+               <button 
+                 onClick={() => setShowCredits(true)}
+                 className="text-[10px] font-mono text-gray-600 hover:text-gray-400 transition-colors tracking-widest uppercase"
+               >
+                 SYSTEM CREDITS
+               </button>
+            </div>
+          )}
         </div>
 
         {/* Right Side: Roster in Lobby */}
