@@ -140,9 +140,9 @@ export const Lobby: React.FC<LobbyProps> = ({ onStart }) => {
   };
 
   return (
-    <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4 relative overflow-hidden">
-      <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1598556776374-3382fab3e390?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center opacity-20"></div>
-      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-transparent"></div>
+    <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4 relative overflow-y-auto overflow-x-hidden">
+      <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1598556776374-3382fab3e390?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center opacity-20 fixed"></div>
+      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-transparent fixed"></div>
 
       <AccountModal 
         isOpen={showProfile} 
@@ -165,9 +165,9 @@ export const Lobby: React.FC<LobbyProps> = ({ onStart }) => {
         onClose={() => setShowHowToPlay(false)}
       />
 
-      <div className="relative z-10 max-w-7xl w-full flex gap-6">
-        {/* Left Side: Leaderboard */}
-        <div className="w-80 hidden xl:flex flex-col gap-4 h-[600px]">
+      <div className="relative z-10 max-w-7xl w-full flex flex-col lg:flex-row gap-6 items-start lg:items-stretch">
+        {/* Left Side: Leaderboard - Hidden on mobile/tablet, shown on XL */}
+        <div className="w-80 hidden xl:flex flex-col gap-4 h-[600px] shrink-0">
              <div className="bg-gray-900/90 border border-gray-800 p-4 rounded-2xl shadow-2xl backdrop-blur-md flex-1 flex flex-col">
                  <div className="flex items-center justify-between mb-4 border-b border-gray-800 pb-2">
                     <div className="flex items-center gap-2">
@@ -183,28 +183,28 @@ export const Lobby: React.FC<LobbyProps> = ({ onStart }) => {
         </div>
 
         {/* Center: Controls */}
-        <div className="flex-1 bg-gray-900/90 border border-gray-800 p-8 rounded-2xl shadow-2xl backdrop-blur-md h-fit min-h-[500px] flex flex-col">
+        <div className="flex-1 w-full bg-gray-900/90 border border-gray-800 p-4 md:p-8 rounded-2xl shadow-2xl backdrop-blur-md h-fit min-h-[400px] md:min-h-[500px] flex flex-col relative">
           {/* Header */}
           <div className="text-center mb-4 relative">
-            <h1 className="text-6xl font-bold font-mono text-white mb-1 tracking-tighter leading-none">
+            <h1 className="text-3xl md:text-6xl font-bold font-mono text-white mb-1 tracking-tighter leading-none">
               SURVIVAL<br/><span className="text-red-600">PROTOCOL: 24</span>
             </h1>
-            <p className="text-gray-400 font-mono text-sm tracking-wide">MULTIPLAYER STRATEGY SIMULATION</p>
+            <p className="text-gray-400 font-mono text-[10px] md:text-sm tracking-wide mt-1 md:mt-2">MULTIPLAYER STRATEGY SIMULATION</p>
             
             <div className="absolute top-0 left-0 flex gap-1">
                 <button 
                     onClick={() => setShowUpdates(true)}
-                    className="p-2 text-gray-500 hover:text-white hover:bg-gray-800 rounded transition-colors flex flex-col items-center gap-1 group"
+                    className="p-1 md:p-2 text-gray-500 hover:text-white hover:bg-gray-800 rounded transition-colors flex flex-col items-center gap-1 group"
                     title="Patch Notes"
                 >
-                    <FileText size={20} />
+                    <FileText size={16} className="md:w-5 md:h-5" />
                 </button>
                 <button 
                     onClick={() => setShowCredits(true)}
-                    className="p-2 text-gray-500 hover:text-white hover:bg-gray-800 rounded transition-colors flex flex-col items-center gap-1 group"
+                    className="p-1 md:p-2 text-gray-500 hover:text-white hover:bg-gray-800 rounded transition-colors flex flex-col items-center gap-1 group"
                     title="Credits"
                 >
-                    <Info size={20} />
+                    <Info size={16} className="md:w-5 md:h-5" />
                 </button>
             </div>
 
@@ -212,19 +212,19 @@ export const Lobby: React.FC<LobbyProps> = ({ onStart }) => {
                 {user && (
                   <button 
                       onClick={() => setShowProfile(true)}
-                      className="p-2 text-gray-500 hover:text-white hover:bg-gray-800 rounded transition-colors flex flex-col items-center gap-1 group"
+                      className="p-1 md:p-2 text-gray-500 hover:text-white hover:bg-gray-800 rounded transition-colors flex flex-col items-center gap-1 group"
                       title="Profile"
                   >
-                      <User size={20} />
+                      <User size={16} className="md:w-5 md:h-5" />
                   </button>
                 )}
                 {user && (
                    <button 
                       onClick={logout}
-                      className="p-2 text-red-500 hover:text-red-400 hover:bg-red-900/30 rounded transition-colors flex flex-col items-center gap-1 group"
+                      className="p-1 md:p-2 text-red-500 hover:text-red-400 hover:bg-red-900/30 rounded transition-colors flex flex-col items-center gap-1 group"
                       title="Logout"
                   >
-                      <LogOut size={20} />
+                      <LogOut size={16} className="md:w-5 md:h-5" />
                   </button>
                 )}
             </div>
@@ -248,24 +248,24 @@ export const Lobby: React.FC<LobbyProps> = ({ onStart }) => {
              ) : (
                 <>
                   <div className="text-center mb-6">
-                     <p className="text-[10px] font-mono text-gray-500 mb-0.5 tracking-widest">OPERATIVE ACTIVE</p>
-                     <div className="text-3xl text-yellow-500 font-bold tracking-widest uppercase">{userData?.username}</div>
+                     <p className="text-[9px] md:text-[10px] font-mono text-gray-500 mb-0.5 tracking-widest">OPERATIVE ACTIVE</p>
+                     <div className="text-2xl md:text-3xl text-yellow-500 font-bold tracking-widest uppercase">{userData?.username}</div>
                   </div>
 
                   {inLobby ? (
                     // ==============================
                     // 4. ROOM LOBBY (ACTIVE ROOM)
                     // ==============================
-                    <div className="space-y-6 animate-fade-in">
-                      <div className="text-center border border-gray-700 bg-black/50 p-6 rounded-lg relative">
+                    <div className="space-y-4 md:space-y-6 animate-fade-in">
+                      <div className="text-center border border-gray-700 bg-black/50 p-4 md:p-6 rounded-lg relative">
                         <div className="absolute top-2 right-2 flex gap-1">
-                           <div className="text-[10px] bg-gray-800 px-2 py-1 rounded text-gray-400 font-mono">
+                           <div className="text-[9px] md:text-[10px] bg-gray-800 px-2 py-1 rounded text-gray-400 font-mono">
                                {roomData?.is_public ? 'PUBLIC' : 'PRIVATE'}
                            </div>
                         </div>
                         <p className="text-gray-500 text-xs font-mono mb-2">ACCESS CODE</p>
-                        <div className="text-5xl font-mono text-yellow-500 tracking-[0.2em] font-bold mb-4">{roomId}</div>
-                        <div className="text-gray-300 font-bold mb-2 uppercase tracking-wide">{roomData?.room_name || "LOBBY"}</div>
+                        <div className="text-4xl md:text-5xl font-mono text-yellow-500 tracking-[0.2em] font-bold mb-4">{roomId}</div>
+                        <div className="text-gray-300 font-bold mb-2 uppercase tracking-wide text-sm md:text-base">{roomData?.room_name || "LOBBY"}</div>
                         <div className="flex items-center justify-center space-x-2 text-gray-400">
                            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
                            <span className="text-xs font-mono">PLAYERS: {players.length}/24</span>
@@ -275,19 +275,19 @@ export const Lobby: React.FC<LobbyProps> = ({ onStart }) => {
                       <div className="flex gap-3">
                         <button 
                           onClick={handleLeaveRoom}
-                          className="flex-1 py-3 rounded font-bold text-sm tracking-widest border border-gray-600 hover:bg-gray-800 text-gray-400 transition-colors"
+                          className="flex-1 py-3 rounded font-bold text-xs md:text-sm tracking-widest border border-gray-600 hover:bg-gray-800 text-gray-400 transition-colors"
                         >
                           LEAVE ROOM
                         </button>
                         {roomData?.host_username === userData?.username ? (
                             <button 
                               onClick={() => startGame()}
-                              className="flex-[2] py-3 rounded font-bold text-sm tracking-widest bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-900/50 transition-colors"
+                              className="flex-[2] py-3 rounded font-bold text-xs md:text-sm tracking-widest bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-900/50 transition-colors"
                             >
                               START MATCH
                             </button>
                         ) : (
-                            <div className="flex-[2] flex items-center justify-center text-xs font-mono text-gray-500 animate-pulse border border-gray-800 rounded bg-black/20">
+                            <div className="flex-[2] flex items-center justify-center text-[10px] md:text-xs font-mono text-gray-500 animate-pulse border border-gray-800 rounded bg-black/20">
                                 WAITING FOR HOST...
                             </div>
                         )}
@@ -300,28 +300,28 @@ export const Lobby: React.FC<LobbyProps> = ({ onStart }) => {
                     <>
                       {/* 1. MAIN MENU */}
                       {mode === 'MENU' && (
-                        <div className="space-y-4 animate-fade-in">
+                        <div className="space-y-3 md:space-y-4 animate-fade-in">
                             <button 
                               onClick={handlePlayClick}
-                              className="w-full py-6 rounded-lg font-bold text-2xl tracking-[0.2em] transition-all flex items-center justify-center space-x-3 bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-900/50 group"
+                              className="w-full py-4 md:py-6 rounded-lg font-bold text-xl md:text-2xl tracking-[0.2em] transition-all flex items-center justify-center space-x-3 bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-900/50 group"
                             >
-                              <Play size={24} className="fill-current group-hover:scale-110 transition-transform" />
+                              <Play size={20} className="fill-current group-hover:scale-110 transition-transform md:w-6 md:h-6" />
                               <span>PLAY</span>
                             </button>
 
                             <button 
                               onClick={handlePracticeClick}
-                              className="w-full py-4 rounded-lg font-bold text-lg tracking-[0.2em] transition-all flex items-center justify-center space-x-3 bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-gray-500 text-gray-300 group"
+                              className="w-full py-3 md:py-4 rounded-lg font-bold text-base md:text-lg tracking-[0.2em] transition-all flex items-center justify-center space-x-3 bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-gray-500 text-gray-300 group"
                             >
-                              <Zap size={20} className="text-yellow-500 group-hover:scale-110 transition-transform" />
+                              <Zap size={18} className="text-yellow-500 group-hover:scale-110 transition-transform md:w-5 md:h-5" />
                               <span>PRACTICE</span>
                             </button>
 
                             <button 
                               onClick={() => setShowHowToPlay(true)}
-                              className="w-full py-3 rounded-lg font-bold text-sm tracking-[0.2em] transition-all flex items-center justify-center space-x-2 bg-transparent hover:bg-gray-800 border border-gray-800 hover:border-gray-600 text-gray-500 hover:text-gray-300 group"
+                              className="w-full py-3 rounded-lg font-bold text-xs md:text-sm tracking-[0.2em] transition-all flex items-center justify-center space-x-2 bg-transparent hover:bg-gray-800 border border-gray-800 hover:border-gray-600 text-gray-500 hover:text-gray-300 group"
                             >
-                              <BookOpen size={16} className="group-hover:scale-110 transition-transform" />
+                              <BookOpen size={14} className="group-hover:scale-110 transition-transform md:w-4 md:h-4" />
                               <span>HOW TO PLAY</span>
                             </button>
                         </div>
@@ -332,7 +332,7 @@ export const Lobby: React.FC<LobbyProps> = ({ onStart }) => {
                         <div className="space-y-4 animate-fade-in flex flex-col h-full min-h-[300px]">
                            {/* Browser Header */}
                            <div className="flex justify-between items-center border-b border-gray-800 pb-2 mb-2">
-                              <h3 className="text-gray-400 font-mono text-sm">PUBLIC FREQUENCIES</h3>
+                              <h3 className="text-gray-400 font-mono text-xs md:text-sm">PUBLIC FREQUENCIES</h3>
                               <div className="flex gap-2">
                                   <button onClick={() => setMode('CREATE')} className="text-[10px] bg-yellow-900/20 text-yellow-500 px-2 py-1 rounded border border-yellow-800 hover:bg-yellow-900/40 flex items-center gap-1">
                                       <Plus size={10} /> NEW ROOM
@@ -414,7 +414,7 @@ export const Lobby: React.FC<LobbyProps> = ({ onStart }) => {
                       {/* 3. CREATE ROOM FLOW */}
                       {mode === 'CREATE' && (
                          <div className="space-y-4 animate-fade-in">
-                            <h3 className="text-center text-gray-400 font-mono text-sm border-b border-gray-800 pb-2">INITIALIZE PROTOCOL</h3>
+                            <h3 className="text-center text-gray-400 font-mono text-xs md:text-sm border-b border-gray-800 pb-2">INITIALIZE PROTOCOL</h3>
                             
                             <div className="grid grid-cols-1 gap-3">
                                 <button 
@@ -496,9 +496,9 @@ export const Lobby: React.FC<LobbyProps> = ({ onStart }) => {
           )}
         </div>
 
-        {/* Right Side: Roster in Lobby */}
+        {/* Right Side: Roster in Lobby OR Tips - Responsive stacking */}
         {inLobby ? (
-          <div className="w-80 bg-gray-900/90 border border-gray-800 p-4 rounded-2xl shadow-2xl backdrop-blur-md flex flex-col h-[600px]">
+          <div className="w-full lg:w-80 bg-gray-900/90 border border-gray-800 p-4 rounded-2xl shadow-2xl backdrop-blur-md flex flex-col h-[300px] lg:h-[600px] shrink-0">
              <div className="flex items-center justify-between mb-4 border-b border-gray-800 pb-2">
                <h3 className="text-gray-400 font-mono text-xs uppercase tracking-widest flex items-center gap-2">
                   <Users size={14} />
@@ -518,7 +518,7 @@ export const Lobby: React.FC<LobbyProps> = ({ onStart }) => {
              </div>
           </div>
         ) : (
-          <div className="w-80 flex flex-col h-[600px] gap-4">
+          <div className="w-full lg:w-80 flex flex-col h-[200px] lg:h-[600px] gap-4 shrink-0">
              <TipsChat />
           </div>
         )}

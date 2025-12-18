@@ -71,7 +71,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
   const attackAction = player.hasPistol 
     ? { 
         type: ActionType.SHOOT, 
-        icon: <Crosshair size={28} />, 
+        icon: (s: number) => <Crosshair size={s} />, 
         label: 'SHOOT', 
         desc: `${GAME_CONFIG.PISTOL_DAMAGE_MIN}-${GAME_CONFIG.PISTOL_DAMAGE_MAX} DMG`,
         hunger: GAME_CONFIG.PISTOL_COST_HUNGER,
@@ -84,7 +84,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
       }
     : { 
         type: ActionType.ATTACK, 
-        icon: <Sword size={28} />, 
+        icon: (s: number) => <Sword size={s} />, 
         label: 'ATTACK', 
         desc: '30-40 DMG',
         hunger: GAME_CONFIG.COST_ATTACK_HUNGER,
@@ -99,7 +99,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
     attackAction,
     { 
         type: ActionType.DEFEND, 
-        icon: <Shield size={28} />, 
+        icon: (s: number) => <Shield size={s} />, 
         label: 'DEFEND', 
         desc: 'Block Dmg',
         hunger: GAME_CONFIG.COST_DEFEND_HUNGER,
@@ -111,7 +111,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
     },
     { 
         type: ActionType.RUN, 
-        icon: <Wind size={28} />, 
+        icon: (s: number) => <Wind size={s} />, 
         label: 'EXPLORE', 
         desc: 'Dodge + Loot',
         hunger: GAME_CONFIG.COST_RUN_HUNGER,
@@ -124,9 +124,9 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
     },
     { 
         type: ActionType.HEAL, 
-        icon: <PlusCircle size={28} />, 
+        icon: (s: number) => <PlusCircle size={s} />, 
         label: 'HEAL', 
-        desc: `+${GAME_CONFIG.HEAL_AMOUNT} HP (Target)`,
+        desc: `+${GAME_CONFIG.HEAL_AMOUNT} HP`,
         hunger: 0,
         fatigue: GAME_CONFIG.COST_HEAL_FATIGUE,
         color: 'text-emerald-400', 
@@ -138,7 +138,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
     },
     { 
         type: ActionType.EAT, 
-        icon: <Utensils size={28} />, 
+        icon: (s: number) => <Utensils size={s} />, 
         label: 'EAT', 
         desc: `+${GAME_CONFIG.EAT_REGEN} Hunger`,
         hunger: -GAME_CONFIG.EAT_REGEN, 
@@ -152,7 +152,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
     },
     { 
         type: ActionType.REST, 
-        icon: <Moon size={28} />, 
+        icon: (s: number) => <Moon size={s} />, 
         label: 'REST', 
         desc: `+${GAME_CONFIG.REST_REGEN} Fatigue`,
         hunger: 0,
@@ -167,7 +167,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
   ];
 
   return (
-    <div className="h-full flex items-center gap-3 relative">
+    <div className="h-full flex items-center gap-2 md:gap-3 relative">
       <BagModal 
          isOpen={showBag} 
          inventory={player.inventory} 
@@ -203,20 +203,24 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
             onClick={() => !isDisabled && onActionSelect(act.type)}
             disabled={isDisabled as boolean}
             className={`
-              relative flex flex-col items-center justify-between p-2 rounded-lg border-2 transition-all duration-200 h-28 w-28 text-center shrink-0
+              relative flex flex-col items-center justify-between p-1.5 md:p-2 rounded-lg border-2 transition-all duration-200 
+              h-24 w-24 md:h-28 md:w-28 text-center shrink-0
               ${isActive ? `${act.border} ${act.bg} shadow-[0_0_15px_rgba(0,0,0,0.5)] scale-105 z-10` : 'border-gray-800 bg-gray-900 hover:bg-gray-800 hover:border-gray-600'}
               ${isDisabled ? 'opacity-40 grayscale cursor-not-allowed' : 'hover:-translate-y-1'}
             `}
           >
-            <div className={`text-xs font-bold font-mono tracking-widest ${isActive ? 'text-white' : 'text-gray-400'}`}>
+            <div className={`text-[10px] md:text-xs font-bold font-mono tracking-widest ${isActive ? 'text-white' : 'text-gray-400'}`}>
               {act.label}
             </div>
-            <div className={`${isActive ? act.color : 'text-gray-500'} mb-1`}>
-              {act.icon}
+            <div className={`${isActive ? act.color : 'text-gray-500'} mb-0.5 md:mb-1 hidden md:block`}>
+              {act.icon(28)}
             </div>
-            <div className="w-full space-y-1">
-               <div className="text-[9px] font-mono text-gray-300 truncate leading-none">{act.desc}</div>
-               <div className="flex justify-center gap-2 text-[9px] font-mono font-bold">
+            <div className={`${isActive ? act.color : 'text-gray-500'} mb-0.5 md:mb-1 block md:hidden`}>
+              {act.icon(20)}
+            </div>
+            <div className="w-full space-y-0.5 md:space-y-1">
+               <div className="text-[9px] md:text-[10px] font-mono text-gray-300 truncate leading-none">{act.desc}</div>
+               <div className="flex justify-center gap-1 md:gap-2 text-[9px] md:text-[10px] font-mono font-bold">
                   {act.hunger !== 0 && (
                       <span className={act.isGain ? 'text-green-500' : (player.hunger < act.hunger && !adminNoCost ? 'text-red-600 animate-pulse' : 'text-orange-500')}>
                          {act.isGain ? '+' : '-'}{Math.abs(adminNoCost ? 0 : act.hunger)}H
@@ -232,44 +236,45 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
             {/* @ts-ignore */}
             {act.cooldown && act.cooldown > 0 && !adminNoCost && (
                 <div className="absolute inset-0 bg-black/80 flex items-center justify-center rounded-md backdrop-blur-[1px]">
-                  <span className="text-sm font-bold text-white font-mono">CD: {act.cooldown}d</span>
+                  <span className="text-xs md:text-sm font-bold text-white font-mono">CD: {act.cooldown}d</span>
                 </div>
             )}
             {/* Stun Overlay */}
             {isBlockedByStun && !adminNoCost && (
                 <div className="absolute inset-0 bg-black/80 flex items-center justify-center rounded-md backdrop-blur-[1px] z-20">
-                  <span className="text-sm font-bold text-red-500 font-mono">STUNNED</span>
+                  <span className="text-xs md:text-sm font-bold text-red-500 font-mono">STUNNED</span>
                 </div>
             )}
             {/* Lockdown Overlay */}
             {/* @ts-ignore */}
             {act.disabledCondition && isLockdown && !adminNoCost && (
                 <div className="absolute inset-0 bg-black/80 flex items-center justify-center rounded-md backdrop-blur-[1px] z-20 border border-red-900/50">
-                  <span className="text-sm font-bold text-red-500 font-mono">LOCKED</span>
+                  <span className="text-xs md:text-sm font-bold text-red-500 font-mono">LOCKED</span>
                 </div>
             )}
             {isActive && (
-                <div className={`absolute -bottom-2 w-12 h-1 ${act.color.replace('text', 'bg')} rounded-full shadow-lg`}></div>
+                <div className={`absolute -bottom-2 w-10 md:w-12 h-1 ${act.color.replace('text', 'bg')} rounded-full shadow-lg`}></div>
             )}
           </button>
         );
       })}
 
       {/* SEPARATOR */}
-      <div className="w-px h-16 bg-gray-800 mx-1"></div>
+      <div className="w-px h-12 md:h-16 bg-gray-800 mx-0.5 md:mx-1"></div>
 
       {/* BAG BUTTON */}
       <button 
         onClick={handleOpenBag}
-        className="h-28 w-16 border-2 border-gray-800 bg-gray-900 rounded-lg flex flex-col items-center justify-center hover:bg-gray-800 hover:border-gray-600 transition-all group shrink-0 hover:-translate-y-1 cursor-pointer relative"
+        className="h-24 w-14 md:h-28 md:w-16 border-2 border-gray-800 bg-gray-900 rounded-lg flex flex-col items-center justify-center hover:bg-gray-800 hover:border-gray-600 transition-all group shrink-0 hover:-translate-y-1 cursor-pointer relative"
       >
         <div className="relative">
-            <Backpack size={24} className="text-gray-500 mb-2 group-hover:text-yellow-500" />
+            <Backpack size={20} className="text-gray-500 mb-1 md:mb-2 group-hover:text-yellow-500 md:hidden" />
+            <Backpack size={24} className="text-gray-500 mb-2 group-hover:text-yellow-500 hidden md:block" />
             {hasNewItems && (
                 <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-yellow-500 rounded-full border border-gray-900"></div>
             )}
         </div>
-        <span className="text-[10px] font-mono text-gray-400 tracking-widest group-hover:text-white">BAG</span>
+        <span className="text-[9px] md:text-[10px] font-mono text-gray-400 tracking-widest group-hover:text-white">BAG</span>
       </button>
     </div>
   );

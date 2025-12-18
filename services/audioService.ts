@@ -4,6 +4,13 @@ class AudioService {
   private masterGain: GainNode | null = null;
   private bgmNodes: AudioNode[] = [];
   private volume: number = 0.4;
+  
+  // Dynamic Synth nodes for updates
+  private osc1: OscillatorNode | null = null;
+  private osc2: OscillatorNode | null = null;
+  private filter: BiquadFilterNode | null = null;
+  private lfo: OscillatorNode | null = null;
+  private lfoGain: GainNode | null = null;
 
   constructor() {
     try {
@@ -59,61 +66,88 @@ class AudioService {
     return buffer;
   }
 
-  // --- BACKGROUND MUSIC (GENERATIVE DRONE) ---
+  // --- BACKGROUND MUSIC (DYNAMIC GENERATIVE DRONE) ---
 
-  startAmbient() {
+  startAmbient(day: number = 1) {
     if (!this.ctx || !this.masterGain || this.bgmNodes.length > 0) return;
     this.ensureContext();
 
     const t = this.ctx.currentTime;
-    const rootFreq = 55; // A1
-
-    // Drone 1: Sine
-    const osc1 = this.ctx.createOscillator();
-    osc1.type = 'sine';
-    osc1.frequency.value = rootFreq;
     
-    // Drone 2: Sawtooth (Detuned)
-    const osc2 = this.ctx.createOscillator();
-    osc2.type = 'sawtooth';
-    osc2.frequency.value = rootFreq * 1.01;
+    // Intensity scaling (0.0 to 1.0 based on day 1 to 50)
+    const intensity = Math.min((day - 1) / 50, 1.0);
+    const rootFreq = 55 + (intensity * 20); // Frequency climbs slightly with days
+
+    // Drone 1: Sine (Foundational)
+    this.osc1 = this.ctx.createOscillator();
+    this.osc1.type = 'sine';
+    this.osc1.frequency.setValueAtTime(rootFreq, t);
+    
+    // Drone 2: Sawtooth (Harsher, detuned based on intensity)
+    this.osc2 = this.ctx.createOscillator();
+    this.osc2.type = 'sawtooth';
+    // More intensity = more dissonance (detune)
+    const detune = 1.01 + (intensity * 0.05); 
+    this.osc2.frequency.setValueAtTime(rootFreq * detune, t);
 
     // Filter for Sawtooth
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.value = 120;
-    filter.Q.value = 1;
+    this.filter = this.ctx.createBiquadFilter();
+    this.filter.type = 'lowpass';
+    // Opening filter adds high-frequency pressure
+    this.filter.frequency.setValueAtTime(120 + (intensity * 400), t);
+    this.filter.Q.setValueAtTime(1 + (intensity * 10), t);
 
-    // LFO for filter modulation
-    const lfo = this.ctx.createOscillator();
-    lfo.type = 'sine';
-    lfo.frequency.value = 0.1; // Slow breathing
-    const lfoGain = this.ctx.createGain();
-    lfoGain.gain.value = 50; 
+    // LFO for filter modulation (Pulsing Anxiety)
+    this.lfo = this.ctx.createOscillator();
+    this.lfo.type = 'sine';
+    // Faster days = Faster pulse
+    this.lfo.frequency.setValueAtTime(0.1 + (intensity * 2.5), t);
+    
+    this.lfoGain = this.ctx.createGain();
+    this.lfoGain.gain.setValueAtTime(50 + (intensity * 150), t); 
 
     // Gains
     const gain1 = this.ctx.createGain();
-    gain1.gain.value = 0.15;
+    gain1.gain.setValueAtTime(0.15, t);
     
     const gain2 = this.ctx.createGain();
-    gain2.gain.value = 0.08;
+    gain2.gain.setValueAtTime(0.08 + (intensity * 0.05), t);
 
     // Connections
-    lfo.connect(lfoGain);
-    lfoGain.connect(filter.frequency);
+    this.lfo.connect(this.lfoGain);
+    this.lfoGain.connect(this.filter.frequency);
 
-    osc1.connect(gain1);
-    osc2.connect(filter);
-    filter.connect(gain2);
+    this.osc1.connect(gain1);
+    this.osc2.connect(this.filter);
+    this.filter.connect(gain2);
 
     gain1.connect(this.masterGain);
     gain2.connect(this.masterGain);
 
-    osc1.start(t);
-    osc2.start(t);
-    lfo.start(t);
+    this.osc1.start(t);
+    this.osc2.start(t);
+    this.lfo.start(t);
 
-    this.bgmNodes = [osc1, osc2, lfo, gain1, gain2, filter, lfoGain];
+    this.bgmNodes = [this.osc1, this.osc2, this.lfo, gain1, gain2, this.filter, this.lfoGain];
+  }
+
+  public updateAmbient(day: number) {
+    if (!this.ctx || !this.osc1 || !this.osc2 || !this.filter || !this.lfo || !this.lfoGain) return;
+    
+    const t = this.ctx.currentTime;
+    const intensity = Math.min((day - 1) / 50, 1.0);
+    const rootFreq = 55 + (intensity * 20);
+    const detune = 1.01 + (intensity * 0.05);
+
+    // Smoothly ramp parameters to new intensity levels
+    this.osc1.frequency.exponentialRampToValueAtTime(rootFreq, t + 2);
+    this.osc2.frequency.exponentialRampToValueAtTime(rootFreq * detune, t + 2);
+    
+    this.filter.frequency.exponentialRampToValueAtTime(120 + (intensity * 400), t + 2);
+    this.filter.Q.setTargetAtTime(1 + (intensity * 10), t, 0.5);
+    
+    this.lfo.frequency.setTargetAtTime(0.1 + (intensity * 2.5), t, 1.0);
+    this.lfoGain.gain.setTargetAtTime(50 + (intensity * 150), t, 1.0);
   }
 
   stopAmbient() {
@@ -124,6 +158,11 @@ class AudioService {
       } catch (e) {}
     });
     this.bgmNodes = [];
+    this.osc1 = null;
+    this.osc2 = null;
+    this.filter = null;
+    this.lfo = null;
+    this.lfoGain = null;
   }
 
   // --- SOUND EFFECTS ---

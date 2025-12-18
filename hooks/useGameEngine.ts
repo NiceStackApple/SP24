@@ -261,6 +261,10 @@ export const useGameEngine = () => {
          }
 
          const nextDay = prev.day + 1;
+         
+         // Update Ambient BGM intensity for the new day
+         audioManager.updateAmbient(nextDay);
+
          const logs: LogEntry[] = [...prev.logs, { id: `day${nextDay}`, text: `Day ${nextDay} begins.`, type: 'system' as LogType, day: nextDay }];
          let updatedPlayers = [...prev.players];
          let activeWarning = null;
@@ -314,7 +318,7 @@ export const useGameEngine = () => {
                  const newP = { ...p };
                  newP.cooldowns = { ...p.cooldowns, run: runCD, eat: Math.max(0, p.cooldowns.eat - 1), rest: Math.max(0, p.cooldowns.rest - 1), shoot: Math.max(0, p.cooldowns.shoot - 1) };
                  if (newP.pendingActionType) delete newP.pendingActionType; 
-                 newP.activeBuffs = { ...p.activeBuffs, ignoreFatigue: false };
+                 newP.activeBuffs = { ...newP.activeBuffs, ignoreFatigue: false };
                  return newP;
              });
          }
@@ -389,6 +393,7 @@ export const useGameEngine = () => {
   const adminSetDay = (d: number) => {
       if (!state.isPractice) return;
       setState(prev => ({ ...prev, day: d, logs: [...prev.logs, { id: Date.now().toString(), text: `ADMIN: Day set to ${d}`, type: 'system', day: d }] }));
+      audioManager.updateAmbient(d);
   };
 
   const adminTriggerEvent = (type: string) => {
@@ -448,7 +453,7 @@ export const useGameEngine = () => {
   const claimVictory = async () => { if (state.roomCode && !state.isPractice) { await destroyRoomForce(state.roomCode); } leaveGame(); };
 
   const startGame = (playerName: string, roomCode?: string, isHost: boolean = true, existingRoster: string[] = [], startingDay: number = 1, startingPhase: Phase = Phase.DAY, isPractice: boolean = false) => {
-    audioManager.startAmbient();
+    audioManager.startAmbient(startingDay);
     audioManager.playConfirm();
     gameRecordedRef.current = false;
     const volcanoDay = Math.floor(Math.random() * (GAME_CONFIG.VOLCANO_MAX_DAY - GAME_CONFIG.VOLCANO_MIN_DAY + 1)) + GAME_CONFIG.VOLCANO_MIN_DAY;

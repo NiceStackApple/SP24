@@ -36,14 +36,14 @@ export const GameLog: React.FC<GameLogProps> = ({ logs, myPlayerId }) => {
 
   return (
     <div className="flex flex-col h-full bg-gray-950">
-      <div className="bg-black/50 p-3 border-b border-gray-800 flex items-center gap-2">
+      <div className="bg-black/50 p-2 md:p-3 border-b border-gray-800 flex items-center gap-2 shrink-0">
         <Terminal size={14} className="text-gray-400" />
-        <h3 className="text-xs font-mono text-gray-400 uppercase tracking-widest">Activity Log</h3>
+        <h3 className="text-[10px] md:text-xs font-mono text-gray-400 uppercase tracking-widest">Activity Log</h3>
       </div>
       
       <div 
         ref={containerRef}
-        className="flex-1 overflow-y-auto p-4 space-y-1 font-mono text-xs custom-scrollbar"
+        className="flex-1 overflow-y-auto p-2 md:p-4 space-y-1 font-mono text-[10px] md:text-xs custom-scrollbar"
       >
         {logs.length === 0 && <div className="text-gray-700 italic text-center mt-4">Monitoring arena events...</div>}
         {logs.map((log) => {
@@ -53,7 +53,7 @@ export const GameLog: React.FC<GameLogProps> = ({ logs, myPlayerId }) => {
           return (
             <div 
                key={log.id} 
-               className={`flex items-start gap-3 animate-fade-in border-l-2 pl-3 py-1 transition-colors
+               className={`flex items-start gap-2 md:gap-3 animate-fade-in border-l-2 pl-2 md:pl-3 py-0.5 md:py-1 transition-colors
                   ${isInvolved ? 'border-yellow-500 bg-yellow-900/10' : 'border-transparent hover:border-gray-800'}
                `}
             >
