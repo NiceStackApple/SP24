@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Play, Users, Lock, User, Trophy, FileText, LogOut, Loader, AlertCircle, ArrowLeft, Plus, RefreshCw, Zap, Info } from 'lucide-react';
+import { Play, Users, Lock, User, Trophy, FileText, LogOut, Loader, AlertCircle, ArrowLeft, Plus, RefreshCw, Zap, Info, BookOpen } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useGameRoom } from '../hooks/useGameRoom';
 import { AccountModal } from './AccountModal';
@@ -8,6 +8,7 @@ import { AuthForms } from './AuthForms';
 import { TipsChat } from './TipsChat';
 import { UpdateLogModal } from './UpdateLogModal';
 import { CreditModal } from './CreditModal';
+import { HowToPlayModal } from './HowToPlayModal';
 import { storageService } from '../services/storageService';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../services/firebase';
@@ -37,6 +38,7 @@ export const Lobby: React.FC<LobbyProps> = ({ onStart }) => {
   const [showProfile, setShowProfile] = useState(false);
   const [showUpdates, setShowUpdates] = useState(false);
   const [showCredits, setShowCredits] = useState(false);
+  const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [profileData, setProfileData] = useState<any>(null);
   
   // Browser State
@@ -156,6 +158,11 @@ export const Lobby: React.FC<LobbyProps> = ({ onStart }) => {
       <CreditModal 
         isOpen={showCredits}
         onClose={() => setShowCredits(false)}
+      />
+
+      <HowToPlayModal 
+        isOpen={showHowToPlay}
+        onClose={() => setShowHowToPlay(false)}
       />
 
       <div className="relative z-10 max-w-7xl w-full flex gap-6">
@@ -308,6 +315,14 @@ export const Lobby: React.FC<LobbyProps> = ({ onStart }) => {
                             >
                               <Zap size={20} className="text-yellow-500 group-hover:scale-110 transition-transform" />
                               <span>PRACTICE</span>
+                            </button>
+
+                            <button 
+                              onClick={() => setShowHowToPlay(true)}
+                              className="w-full py-3 rounded-lg font-bold text-sm tracking-[0.2em] transition-all flex items-center justify-center space-x-2 bg-transparent hover:bg-gray-800 border border-gray-800 hover:border-gray-600 text-gray-500 hover:text-gray-300 group"
+                            >
+                              <BookOpen size={16} className="group-hover:scale-110 transition-transform" />
+                              <span>HOW TO PLAY</span>
                             </button>
                         </div>
                       )}
