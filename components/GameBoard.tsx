@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { GameState, ActionType, Phase, PlayerStatus } from '../types';
 import { PlayerCard } from './PlayerCard';
 import { ActionPanel } from './ActionPanel';
@@ -20,6 +20,7 @@ interface GameBoardProps {
   onLeaveGame: () => void;
   onSurrender: () => void;
   onCloseModal?: () => void;
+  onCloseWarning?: () => void;
   onClaimVictory?: () => void;
   adminSetDay?: (d: number) => void;
   adminTriggerEvent?: (t: string) => void;
@@ -28,7 +29,6 @@ interface GameBoardProps {
   adminWinGame?: () => void;
 }
 
-// STYLE 1: WARNING OVERLAY (MODAL STYLE - 1 DAY BEFORE)
 const WarningOverlay: React.FC<{ 
   title: string; 
   subtitle: string; 
@@ -70,7 +70,6 @@ const WarningOverlay: React.FC<{
   );
 };
 
-// STYLE 2: ACTIVE EVENT BAR (BAR STYLE - DURING EVENT)
 const ActiveEventBar: React.FC<{ 
   title: string; 
   subtitle: string; 
@@ -144,6 +143,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   onLeaveGame,
   onSurrender,
   onCloseModal,
+  onCloseWarning,
   onClaimVictory,
   adminSetDay,
   adminTriggerEvent,
@@ -161,6 +161,26 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   const [showSettings, setShowSettings] = useState(false);
   const [cleanupTimer, setCleanupTimer] = useState(45);
   const isWinner = state.phase === Phase.GAME_OVER && state.winnerId === state.myPlayerId;
+
+  const gridContainerRef = useRef<HTMLDivElement>(null);
+
+  // REFINED AUTO-SCROLL EFFECT
+  useEffect(() => {
+    if (state.currentEvent && state.currentEvent.sourceId !== 'ENVIRONMENT') {
+        const isInteraction = [ActionType.ATTACK, ActionType.SHOOT, ActionType.HEAL].includes(state.currentEvent.type as ActionType);
+        
+        // If it's an interaction (Sword/Pistol/Heal), scroll to TARGET
+        // Otherwise (Eat/Rest/Run), scroll to SOURCE
+        const targetId = (isInteraction && state.currentEvent.targetId) 
+          ? state.currentEvent.targetId 
+          : state.currentEvent.sourceId;
+
+        const el = document.getElementById(`player-card-${targetId}`);
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+        }
+    }
+  }, [state.currentEvent]);
 
   useEffect(() => {
     if (state.phase === Phase.GAME_OVER) {
@@ -300,7 +320,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             title={state.activeWarning.title} 
             subtitle={state.activeWarning.subtitle} 
             theme={state.activeWarning.theme} 
-            onDismiss={() => onCloseModal && onCloseModal()}
+            onDismiss={() => onCloseWarning ? onCloseWarning() : (onCloseModal && onCloseModal())}
          />
       )}
 
@@ -383,7 +403,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             </div>
          </header>
 
-         <div className="flex-1 p-6 overflow-y-auto bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-gray-900 to-black relative">
+         <div 
+           ref={gridContainerRef}
+           className="flex-1 p-6 overflow-y-auto bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-gray-900 to-black relative custom-scrollbar"
+         >
             {(state.volcanoEventActive || state.gasEventActive || state.monsterEventActive || state.zoneShrinkActive) && <div className="absolute inset-0 z-40 bg-transparent cursor-not-allowed"></div>}
             <div className="grid grid-cols-4 lg:grid-cols-6 gap-4 max-w-[1400px] mx-auto">
               {state.players.map(player => (

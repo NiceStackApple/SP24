@@ -17,6 +17,7 @@ const App: React.FC = () => {
     pendingAction,
     sendChatMessage,
     closeModal,
+    closeWarning,
     // Admin
     adminSetDay,
     adminTriggerEvent,
@@ -43,6 +44,7 @@ const App: React.FC = () => {
       onLeaveGame={leaveGame}
       onSurrender={surrenderGame}
       onCloseModal={closeModal}
+      onCloseWarning={closeWarning}
       onClaimVictory={claimVictory}
       // Admin
       adminSetDay={adminSetDay}

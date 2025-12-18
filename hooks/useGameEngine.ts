@@ -74,6 +74,7 @@ const getLogTemplate = (key: string, params: { source?: string, target?: string,
             variants.push(`${target} takes a hit from ${source} (-${val} HP).`);
             break;
         case 'SHOOT_HIT':
+            // PISTOL RULE: Anonymous Source
             variants.push(`${target} was shot (-${val} HP).`);
             variants.push(`${target} took a bullet (-${val} HP).`);
             variants.push(`${target} hit by gunfire (-${val} HP).`);
@@ -408,7 +409,9 @@ export const useGameEngine = () => {
 
   const adminWinGame = () => { if (!state.isPractice) return; setState(prev => ({ ...prev, phase: Phase.GAME_OVER, winnerId: prev.myPlayerId, logs: [...prev.logs, { id: Date.now().toString(), text: `ADMIN: Force Victory.`, type: 'system', day: prev.day }] })); };
 
-  const closeModal = () => { setState(prev => ({ ...prev, modal: { ...prev.modal, isOpen: false }, activeWarning: null })); };
+  const closeModal = () => { setState(prev => ({ ...prev, modal: { ...prev.modal, isOpen: false } })); };
+
+  const closeWarning = () => { setState(prev => ({ ...prev, activeWarning: null })); };
 
   const leaveGame = async () => {
     if (state.roomCode && !state.isPractice) {
@@ -664,5 +667,5 @@ export const useGameEngine = () => {
       if (state.roomCode && !state.isPractice) { try { await addDoc(collection(db, 'rooms', state.roomCode, 'messages'), msg); } catch(e) { console.error("Failed to send message", e); } }
   };
 
-  return { state, startGame, submitAction, useItem, leaveGame, surrenderGame, claimVictory, pendingAction, sendChatMessage, closeModal, adminSetDay, adminTriggerEvent, adminKillPlayer, adminToggleNoCost, adminWinGame };
+  return { state, startGame, submitAction, useItem, leaveGame, surrenderGame, claimVictory, pendingAction, sendChatMessage, closeModal, closeWarning, adminSetDay, adminTriggerEvent, adminKillPlayer, adminToggleNoCost, adminWinGame };
 };
