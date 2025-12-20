@@ -31,13 +31,28 @@ export const UpdateLogModal: React.FC<UpdateLogModalProps> = ({ isOpen, onClose 
 
          <div className="flex-1 overflow-y-auto p-6 space-y-6 font-mono text-sm text-gray-400">
             
-            {/* 2.3.4 */}
+            {/* 2.4.0 */}
             <div>
                <div className="text-white font-bold mb-2 flex items-center justify-between">
+                  <span className="text-lg">v2.4.0</span>
+                  <span className="text-[10px] bg-green-900/30 text-green-400 px-2 py-0.5 rounded border border-green-900">MOBILE OPTIMIZATION</span>
+               </div>
+               <ul className="list-disc pl-5 space-y-2 text-gray-300">
+                  <li><b className="text-green-400">GRID:</b> Player card layout standardized to 4 columns on all devices for consistency.</li>
+                  <li><b className="text-green-400">COMMS:</b> Mobile comms & logs now appear side-by-side in a split view overlay for rapid intel access.</li>
+                  <li><b className="text-green-400">UI:</b> Player cards streamlined for mobile visibility. Non-essential stats hidden on small screens.</li>
+               </ul>
+            </div>
+
+            <div className="w-full h-px bg-gray-800"></div>
+
+            {/* 2.3.4 */}
+            <div>
+               <div className="text-gray-300 font-bold mb-2 flex items-center justify-between">
                   <span className="text-lg">v2.3.4</span>
                   <span className="text-[10px] bg-blue-900/30 text-blue-400 px-2 py-0.5 rounded border border-blue-900">UX UPDATE</span>
                </div>
-               <ul className="list-disc pl-5 space-y-2 text-gray-300">
+               <ul className="list-disc pl-5 space-y-2 text-gray-400">
                   <li><b className="text-blue-400">UI:</b> Added Bag notification dot to indicate new items obtained.</li>
                   <li><b className="text-blue-400">CLARITY:</b> Notification persists until Bag is opened, preventing missed loot rewards.</li>
                </ul>

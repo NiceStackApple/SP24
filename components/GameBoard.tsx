@@ -9,7 +9,7 @@ import { BattleAnimationLayer } from './BattleAnimationLayer';
 import { GlobalModal } from './GlobalModal';
 import { AdminPanel } from './AdminPanel';
 import { SettingsModal } from './SettingsModal';
-import { Clock, Sun, Moon, Eye, Heart, Skull, Loader, Flame, Biohazard, ShieldAlert, Ghost, AlertTriangle, LogOut, Trophy, Settings, X, MessageSquare } from 'lucide-react';
+import { Clock, Sun, Moon, Eye, Heart, Skull, Loader, Flame, Biohazard, ShieldAlert, Ghost, AlertTriangle, LogOut, Trophy, Settings, X, MessageSquare, Wrench } from 'lucide-react';
 
 interface GameBoardProps {
   state: GameState;
@@ -416,6 +416,16 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               </div>
             </div>
             <div className="flex items-center space-x-2 lg:space-x-4">
+               {/* Mobile Admin Button (Practice Only) */}
+               {state.isPractice && (
+                   <button 
+                      onClick={() => setShowAdminPanel(true)} 
+                      className="lg:hidden p-2 bg-gray-900 hover:bg-gray-800 border border-yellow-700/50 text-yellow-500 rounded transition-colors"
+                   >
+                      <Wrench size={18} />
+                   </button>
+               )}
+
                {/* Mobile Chat Toggle Button */}
                <button onClick={() => setShowMobileChat(true)} className="lg:hidden p-2 text-gray-400 bg-gray-900 border border-gray-700 rounded relative hover:text-white transition-colors">
                   <MessageSquare size={18} />
